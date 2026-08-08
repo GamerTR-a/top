@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orbit Guardian: Elemental Strike</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- HUD Overlay -->
+        <div id="hud">
+            <div class="hud-top">
+                <div id="score-container">
+                    <span class="label">SCORE</span>
+                    <span id="score">000000</span>
+                </div>
+                <div id="combo-container">
+                    <span id="combo-text">COMBO</span>
+                    <span id="combo">x1</span>
+                </div>
+            </div>
+            
+            <div class="hud-bottom">
+                <div id="health-container">
+                    <div class="life-orb filled"></div>
+                    <div class="life-orb filled"></div>
+                    <div class="life-orb filled"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screens -->
+        <div id="menu-screen" class="overlay">
+            <div class="content">
+                <h1 class="glitch-text" data-text="ORBIT GUARDIAN">ORBIT GUARDIAN</h1>
+                <p class="subtitle">ELEMENTAL STRIKE</p>
+                <div class="instructions">
+                    <p>Move mouse to control the <span class="highlight">Guardian Fist</span></p>
+                    <p>Protect the vessel from approaching geometric elements</p>
+                </div>
+                <button id="start-btn">ENGAGE</button>
+            </div>
+        </div>
+
+        <div id="gameover-screen" class="overlay hidden">
+            <div class="content">
+                <h1 class="danger">VESSEL BREACHED</h1>
+                <p class="final-score">TOTAL POINTS: <span id="final-score">0</span></p>
+                <button id="restart-btn">REBOOT SYSTEM</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

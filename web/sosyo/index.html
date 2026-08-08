@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SoSYo - Doğa & Uzay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Katmanlı Yıldız Tozu Arka Planı (Uzay Atmosferi korundu) -->
+    <canvas id="stardust"></canvas>
+
+    <main class="slider-wrapper">
+        <div class="slider-container" id="slider-container">
+            <div class="slider-track" id="slider-track">
+                <!-- Javascript ile Dinamik Kartlar Eklenecek -->
+            </div>
+        </div>
+    </main>
+    
+    <!-- Bugüne Dön Butonu (Başlangıçta gizli veya dışarıda olacak) -->
+    <button id="btn-return-today" class="round-btn float-btn">
+        <span>📍 Bugün</span>
+    </button>
+
+    <!-- Kart Şablonu -->
+    <template id="card-template">
+        <div class="habitat-card">
+            <div class="card-glow"></div>
+            
+            <!-- Doğa/Orman Arka Planı Katmanı (CSS ile şekillenecek) -->
+            <div class="habitat-bg"></div>
+
+            <!-- İçerik -->
+            <div class="card-content">
+                <header class="card-header">
+                    <h3 class="day-label">Tarih</h3>
+                    <div class="streak-badge">
+                        <span class="fire-icon">🌟</span>
+                        <span class="streak-text">Seri: -</span>
+                    </div>
+                </header>
+
+                <div class="counter-display">
+                    <p class="counter-label">Durum</p>
+                    <h2 class="neon-number">0</h2>
+                    <p class="task-draft-text" style="display: none;">Görev Taslağı:<br><span class="neon-text">Harekete Geç!</span></p>
+                </div>
+                
+                <div class="action-area">
+                    <button class="neon-btn">
+                        <span class="plus-icon">+</span>
+                    </button>
+                    <p class="action-hint">Bugün selam verdin mi?</p>
+                    <div class="status-message"></div>
+                </div>
+            </div>
+
+            <!-- Animasyonlu Hayvan ve Çalı Katmanı -->
+            <div class="animal-container">
+                <div class="animal-emoji">🐰</div>
+            </div>
+            <div class="habitat-foreground"></div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>

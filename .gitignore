@@ -1,0 +1,79 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.flutter-plugins
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Derlenmiş uygulama paketleri — repo'da tutulmaz (build_aab.ps1 üretir)
+app-release.aab
+app-release.apk
+
+# Signing keys - never commit these
+android/key.properties
+*.jks
+*.keystore
+
+# Uygulama gizli kimlik bilgileri — asla commit etme
+lib/config/app_config.dart
+
+# Backend secrets
+backend/.env
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# Imza sertifikalari / anahtarlar — asla commit etme
+upload_certificate.pem
+
+# Windows kisa yollari
+*.lnk
+
+# Yerel gecici klasorler
+supabase/.temp/
+
+# Eski yedek kopya klasoru (merge ile kaldirilmisti)
+website copy/
+
+# Topluluk uye bilgileri (ad/telefon/e-posta) — kisileri veri, commit etme
+/data

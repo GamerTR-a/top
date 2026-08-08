@@ -1,0 +1,243 @@
+import 'package:flutter/material.dart';
+import '../services/local_storage_service.dart';
+
+class PrivacyPolicyScreen extends StatefulWidget {
+  final bool isFirstTime;
+  final VoidCallback? onAccepted;
+
+  const PrivacyPolicyScreen({
+    super.key,
+    this.isFirstTime = false,
+    this.onAccepted,
+  });
+
+  @override
+  State<PrivacyPolicyScreen> createState() => _PrivacyPolicyScreenState();
+}
+
+class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
+  bool _accepted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  void _loadStatus() async {
+    final storage = await LocalStorageService.getInstance();
+    if (mounted) {
+      setState(() {
+        _accepted = storage.isPrivacyPolicyAccepted;
+      });
+    }
+  }
+
+  void _handleAccept() async {
+    final storage = await LocalStorageService.getInstance();
+    await storage.setPrivacyPolicyAccepted(true);
+    if (widget.onAccepted != null) {
+      widget.onAccepted!();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Gizlilik Politikası & Kullanım Şartları',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Icon & Title
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _accepted ? Colors.green.withOpacity(0.1) : theme.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Icon(
+                            _accepted ? Icons.verified_user_rounded : Icons.security_rounded,
+                            color: _accepted ? Colors.green : theme.primaryColor,
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'NevGenç Veri Güvenliği',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Google Play Uyumlu Yerel Depolama Politikası',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Section 1: Yerel Depolama Kullanımı
+                    _buildSectionCard(
+                      context,
+                      title: '1. Cihaz İçi Yerel Depolama (Local Storage)',
+                      icon: Icons.sd_card_rounded,
+                      content:
+                          'NevGenç uygulaması, kullanıcı deneyiminizi ve çevrimdışı (offline) çalışma hızınızı artırmak amacıyla uygulama verilerini cihazınızın güvenli yerel depolama alanında (SharedPreferences / Cache) saklar. Yerel depolanan veriler cihazınız dışına izin verilmeksizin aktarılmaz.',
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section 2: İzinler ve Veri Güvenliği
+                    _buildSectionCard(
+                      context,
+                      title: '2. İzinler ve Veri Gizliliği',
+                      icon: Icons.lock_outline_rounded,
+                      content:
+                          'Uygulamamız yalnızca uygulamanın temel işlevleri için gerekli olan ağ erişim (INTERNET) ve bildirim (POST_NOTIFICATIONS) izinlerini talep eder. Konum, rehber veya dosya sisteminiz üzerinde gereksiz erişim izinleri istenmez ve hassas kişisel verileriniz üçüncü taraflarla paylaşılmaz.',
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section 3: Çevrimdışı Önbellek
+                    _buildSectionCard(
+                      context,
+                      title: '3. Çevrimdışı Önbellekleme',
+                      icon: Icons.cloud_off_rounded,
+                      content:
+                          'Uygulamamızda gezindiğiniz gönderiler ve haberler, internet bağlantınız olmadığında da hızlı erişim sağlayabilmeniz için cihazınızın yerel önbelleğinde saklanır. Dilediğiniz an Ayarlar menüsünden önbelleği temizleyebilirsiniz.',
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section 4: İletişim & Haklarınız
+                    _buildSectionCard(
+                      context,
+                      title: '4. Kullanıcı Hakları ve İletişim',
+                      icon: Icons.contact_support_outlined,
+                      content:
+                          'Verilerinizin silinmesini talep etme veya yerel depolamayı temizleme hakkınız saklıdır. Sorularınız için destek ekibimizle iletişime geçebilirsiniz.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom Action Button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _handleAccept,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.primaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                  label: Text(
+                    widget.isFirstTime
+                        ? 'Okudum, Anladım ve Kabul Ediyorum'
+                        : 'Kabul Et ve Devam Et',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required String content,
+  }) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.dividerColor.withOpacity(0.1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20, color: theme.primaryColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GNÇ New — Magazine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030510;
+            --surface: rgba(15, 18, 45, 0.6);
+            --primary: #9d4edd;
+            --secondary: #00f5d4;
+            --accent: #fee440;
+            --text: #f8f9fa;
+            --muted: #adb5bd;
+            --border: rgba(157, 78, 221, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(157, 78, 221, 0.1), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 245, 212, 0.1), transparent 25%);
+        }
+
+        /* --- STARFIELD & METEORS --- */
+        #sf { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+        .star { position: absolute; background: #fff; border-radius: 50%; opacity: 0.22; animation: twinkle var(--d, 3s) infinite alternate; }
+        @keyframes twinkle { from { opacity: 0.08; transform: scale(1); } to { opacity: 0.65; transform: scale(1.5); } }
+        
+        .mtr { position: absolute; height: 2px; border-radius: 4px; opacity: 0; transform: rotate(-35deg); animation: shoot var(--spd, 1s) ease-in forwards; }
+        @keyframes shoot {
+            0% { opacity: 0; transform: rotate(-35deg) translateX(0) scaleX(0.2); }
+            15% { opacity: 1; }
+            85% { opacity: 0.9; }
+            100% { opacity: 0; transform: rotate(-35deg) translateX(-1800px) scaleX(2.5); }
+        }
+
+        /* --- SIDEBAR NAV --- */
+        .sidebar {
+            width: 250px;
+            background: rgba(3, 5, 16, 0.8);
+            border-right: 1px solid var(--border);
+            padding: 40px 20px;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 50px;
+            text-align: center;
+        }
+
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+        }
+
+        .nav-link {
+            padding: 12px 20px;
+            border-radius: 12px;
+            color: var(--muted);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background: rgba(157, 78, 221, 0.1);
+            color: var(--secondary);
+            transform: translateX(10px);
+        }
+
+        .write-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-family: 'Outfit';
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 20px;
+        }
+
+        .write-btn:hover {
+            box-shadow: 0 0 20px rgba(157, 78, 221, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* --- MAIN CONTENT --- */
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        /* --- HEADER / SEARCH --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        .page-title {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 3rem;
+            font-weight: 600;
+        }
+
+        .search-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 12px 25px;
+            border-radius: 30px;
+            width: 300px;
+            color: white;
+            font-family: 'Outfit';
+            outline: none;
+        }
+
+        /* --- MAGAZINE GRID --- */
+        .magazine-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-auto-rows: 250px;
+            gap: 20px;
+        }
+
+        /* Base Card Style */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            backdrop-filter: blur(5px);
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .card.hidden {
+            display: none !important;
+        }
+
+        .card:hover {
+            border-color: var(--secondary);
+            box-shadow: 0 10px 30px rgba(0, 245, 212, 0.1);
+            transform: translateY(-5px);
+        }
+
+        .card-category {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 5px 12px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--muted);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 2;
+        }
+
+        .card-title {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            z-index: 2;
+        }
+
+        .card-meta {
+            font-size: 0.85rem;
+            color: var(--muted);
+            z-index: 2;
+        }
+
+        .card-desc {
+            font-size: 0.95rem;
+            color: #d1d5db;
+            margin-top: 10px;
+            z-index: 2;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .bg-emoji {
+            position: absolute;
+            right: -20px;
+            bottom: -20px;
+            font-size: 10rem;
+            opacity: 0.1;
+            z-index: 0;
+            transition: 0.5s;
+        }
+
+        .card:hover .bg-emoji {
+            transform: scale(1.2) rotate(-10deg);
+            opacity: 0.2;
+        }
+
+        /* Specialized Cards */
+        .card-large {
+            grid-column: span 2;
+            grid-row: span 2;
+            border-radius: 40px;
+            background: linear-gradient(135deg, rgba(157,78,221,0.2), rgba(0,245,212,0.1));
+            border: 1px solid rgba(157,78,221,0.4);
+        }
+        .card-large .card-title { font-size: 2.5rem; }
+
+        .card-tall {
+            grid-column: span 1;
+            grid-row: span 2;
+            border-radius: 0 50px 0 50px; /* Leaf shape */
+        }
+
+        .card-wide {
+            grid-column: span 2;
+            grid-row: span 1;
+            border-radius: 50px 0 50px 0;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-wide .body-content {
+            flex-grow: 1;
+            position: relative;
+            z-index: 2;
+        }
+        .card-wide .card-title { font-size: 1.3rem; margin: 0;}
+        .card-wide .bg-emoji { right: 20px; bottom: 20px; font-size: 6rem; z-index: 1; }
+
+        .card-box {
+            grid-column: span 1;
+            grid-row: span 1;
+            border-radius: 20px;
+        }
+
+        .card-circle {
+            grid-column: span 1;
+            grid-row: span 1;
+            border-radius: 50%;
+            text-align: center;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .card-circle .card-category { position: static; margin-bottom: 15px; }
+
+        .card-accent {
+            background: var(--primary);
+            color: white;
+        }
+        .card-accent .card-meta { color: rgba(255,255,255,0.7); }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            width: 90%;
+            max-width: 600px;
+            padding: 40px;
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: white;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            height: 150px;
+            resize: vertical;
+        }
+
+        @media (max-width: 1024px) {
+            .magazine-grid { grid-template-columns: repeat(2, 1fr); }
+            .card-large { grid-column: span 2; }
+            .card-wide { grid-column: span 2; }
+        }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; padding: 20px; flex-direction: row; align-items: center; justify-content: space-between;}
+            .logo { margin-bottom: 0; font-size: 1.5rem; }
+            .nav-links { display: none; }
+            .magazine-grid { grid-template-columns: 1fr; }
+            .card-large, .card-wide, .card-tall, .card-box, .card-circle { grid-column: span 1; grid-row: span 1; border-radius: 20px; }
+            .header { flex-direction: column; gap: 20px; align-items: flex-start;}
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animasyonlu Arka Plan (Yıldızlar ve Meteorlar) -->
+    <div id="sf"></div>
+    <nav class="sidebar">
+        <div class="logo">GNÇ<br>NEW</div>
+        <div class="nav-links">
+            <a href="#" class="nav-link active" data-filter="all">🌐 Akış</a>
+            <a href="#" class="nav-link" data-filter="Teknoloji">💻 Teknoloji</a>
+            <a href="#" class="nav-link" data-filter="Sanat">🎨 Sanat</a>
+            <a href="#" class="nav-link" data-filter="Spor">⚽ Spor</a>
+            <a href="#" class="nav-link" data-filter="Bilim">🔬 Bilim</a>
+            <a href="#" class="nav-link" data-filter="Kültür">📚 Kültür</a>
+            <a href="#" class="nav-link" data-filter="Müzik">🎵 Müzik</a>
+        </div>
+        <button class="write-btn" onclick="document.getElementById('writeModal').style.display='flex'">+ Yeni İçerik</button>
+    </nav>
+
+    <main class="main-content">
+        <div class="header">
+            <h1 class="page-title">Keşfet</h1>
+            <input type="text" class="search-bar" placeholder="Haber, yazar veya konu ara..." id="searchInput">
+        </div>
+
+        <div class="magazine-grid" id="cardContainer">
+            
+            <!-- Mevcut İçerikler -->
+            <a href="blog_detail.html" target="_blank" class="card card-large" data-category="Teknoloji">
+                <div class="card-category" style="color: var(--secondary); border-color: var(--secondary);">🔥 Gündem</div>
+                <div class="bg-emoji">🚀</div>
+                <div>
+                    <h2 class="card-title">Yapay Zeka Çağında Gençlik: Adaptasyon Süreci</h2>
+                    <p class="card-meta">Ayşe Kaya • 20 Nis 2026 • Teknoloji</p>
+                    <p class="card-desc">Yapay zeka sistemleri artık sadece bilim kurgu filmlerinin konusu değil, günlük hayatımızın tam merkezinde yer alıyor. Gençler olarak bu değişime ayak uydurmak, teknolojiyi rakip değil ortak olarak görmek bizim elimizde.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-tall" data-category="Sanat">
+                <div class="card-category">Sanat</div>
+                <div class="bg-emoji">🎨</div>
+                <div>
+                    <h2 class="card-title">Sokak Sanatı Galerilere Taşınıyor</h2>
+                    <p class="card-meta">Ahmet Can • 18 Nis</p>
+                    <p class="card-desc" style="-webkit-line-clamp: 5;">Graffiti ve duvar sanatları artık büyük sergi salonlarında kendine yer buluyor. Şehrin dokusunu değiştiren bu sanat akımı hakkında her şey detaylarımızda saklı. İstanbul'da gerçekleşen son sergiler bu akımın gücünü gösteriyor.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-box card-accent" data-category="Spor">
+                <div class="card-category" style="border:none;">Spor</div>
+                <div class="bg-emoji" style="opacity: 0.2;">⚽</div>
+                <div>
+                    <h2 class="card-title">Derbi Heyecanı Yaklaşıyor</h2>
+                    <p class="card-meta">Mert Yılmaz</p>
+                    <p class="card-desc" style="color: rgba(255,255,255,0.8);">Şampiyonluk yarışında kritik son viraja girilirken puan farkı sadece 2'ye düştü.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-wide" data-category="Bilim">
+                <div class="body-content">
+                    <div class="card-category" style="position:static; display:inline-block; margin-bottom:10px;">Bilim</div>
+                    <h2 class="card-title">CERN'de Türk Öğrencilerin Başarısı</h2>
+                    <p class="card-meta">Dr. Selin Çelik • 17 Nis 2026</p>
+                    <p class="card-desc">Uluslararası yarışmada dereceye giren üniversite takımları ülkemizi gururlandırdı. ODTÜ ve İTÜ temsilcileri birincilik ödülü ile geri döndüler.</p>
+                </div>
+                <div class="bg-emoji">🔬</div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-box" data-category="Müzik">
+                <div class="card-category">Müzik</div>
+                <div class="bg-emoji">🎵</div>
+                <div>
+                    <h2 class="card-title">Elektronik Müziğin Yeni Yüzleri</h2>
+                    <p class="card-meta">Koray Aslan • 16 Nis</p>
+                    <p class="card-desc">Türk DJ'ler Avrupa'yı sallıyor. Gen Z müzik tarzını nasıl değiştiriyor?</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-circle" data-category="Teknoloji">
+                <div class="bg-emoji">🎮</div>
+                <div>
+                    <h2 class="card-title" style="font-size: 1.1rem; text-align: center;">Steam'de İlk 10'da Türk Oyunu</h2>
+                </div>
+            </a>
+
+            <!-- YENİ EKLENEN İÇERİKLER -->
+            
+            <a href="blog_detail.html" target="_blank" class="card card-box" data-category="Kültür">
+                <div class="card-category">Kültür</div>
+                <div class="bg-emoji">📚</div>
+                <div>
+                    <h2 class="card-title">Z Kuşağı Ne Okuyor?</h2>
+                    <p class="card-meta">Prof. Elif Şimşek • 15 Nis</p>
+                    <p class="card-desc">"Gençler okumuyor" efsanesi verilerle çöküyor. Bilim kurgu ve distopik edebiyata ilgi katlanarak artıyor.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-wide" data-category="Spor">
+                <div class="body-content">
+                    <div class="card-category" style="position:static; display:inline-block; margin-bottom:10px;">Spor</div>
+                    <h2 class="card-title">E-Spor Olimpiyatlara Doğru</h2>
+                    <p class="card-meta">Cem Berk • 14 Nis</p>
+                    <p class="card-desc">Uluslararası Olimpiyat Komitesi, e-sporları resmi turnuvalara dahil etme konusundaki son kararını açıkladı. Türk takımlarının turnuvalardaki dominasyonu da büyük bir merak konusu.</p>
+                </div>
+                <div class="bg-emoji">🥇</div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-tall" data-category="Teknoloji" style="background: rgba(157, 78, 221, 0.1);">
+                <div class="card-category">Teknoloji</div>
+                <div class="bg-emoji">💻</div>
+                <div>
+                    <h2 class="card-title">Kuantum Bilgisayarlar ve Şifreleme Krizi</h2>
+                    <p class="card-meta">Dr. Burak Yıldız • 13 Nis</p>
+                    <p class="card-desc">Klasik şifreleme yöntemleri, kuantum devrimi ile tarihe mi karışıyor? Geleceğin veri güvenliği uzmanlarına büyük bir görev düşüyor. Kuantum şifreleme yöntemlerinin siber güvenlik sektöründe yaratacağı büyük etkiye dair detaylı incelememiz.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-large" data-category="Müzik" style="background: linear-gradient(135deg, rgba(233,30,99,0.2), rgba(156,39,176,0.1)); border-color: rgba(233,30,99,0.4);">
+                <div class="card-category" style="color: #FF4081; border-color: #FF4081;">Müzik & Sanat</div>
+                <div class="bg-emoji">🎧</div>
+                <div>
+                    <h2 class="card-title">Yapay Zeka ile Müzik Üretmek "Sanat" Mı?</h2>
+                    <p class="card-meta">Emre Yılmaz • 11 Nis 2026 • Sanat</p>
+                    <p class="card-desc">Algoritmaların bestelediği müzikler dinlenme rekorları kırıyor. Bir yazılımın ürettiği duygusal bir piyano melodisi, insani bir sanatın yerini tutabilir mi? Telif hakları krizlerinden sanatçıların YZ'ye açtığı davalara kadar müzik endüstrisinde yaşanan tartışmaları masaya yatırdık.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-box card-accent" data-category="Kültür" style="background: #2b2d42;">
+                <div class="card-category" style="border:none;">Kültür</div>
+                <div class="bg-emoji" style="opacity: 0.15;">☕</div>
+                <div>
+                    <h2 class="card-title">3. Nesil Kahve Kültürünün Evrimi</h2>
+                    <p class="card-meta">Elara Türkmen</p>
+                    <p class="card-desc" style="color: rgba(255,255,255,0.7);">Artıkadece bir içecek değil, başlı başına bir seremonisi olan kahve kültürünün sosyolojik incelemesi.</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-circle" data-category="Bilim">
+                <div class="bg-emoji">🪐</div>
+                <div>
+                    <h2 class="card-title" style="font-size: 1.1rem; text-align: center;">Mars Kolonisi İçin Tarih Verildi</h2>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-box" data-category="Sanat">
+                <div class="card-category">Sanat</div>
+                <div class="bg-emoji">📸</div>
+                <div>
+                    <h2 class="card-title">Mobil Fotoğrafçılığın Yükselişi</h2>
+                    <p class="card-meta">Gizem Arıt • 09 Nis</p>
+                    <p class="card-desc">Profesyonel kameralara kafa tutan telefon lensleri sanatı demokratikleştirdi mi?</p>
+                </div>
+            </a>
+
+            <a href="blog_detail.html" target="_blank" class="card card-wide" data-category="Teknoloji">
+                <div class="body-content">
+                    <div class="card-category" style="position:static; display:inline-block; margin-bottom:10px;">Teknoloji / Web3</div>
+                    <h2 class="card-title">Merkeziyetsiz İnternet Mümkün Mü?</h2>
+                    <p class="card-meta">Alp Demir • 08 Nis 2026</p>
+                    <p class="card-desc">Web3 kavramı sadece bir heves mi yoksa interneti tekellerden kurtarmanın tek yolu mu? Topluluğumuz uzmanlarla tartıştı.</p>
+                </div>
+                <div class="bg-emoji">🌐</div>
+            </a>
+
+        </div>
+    </main>
+
+    <!-- Yazı Yazma Modalı -->
+    <div class="modal-overlay" id="writeModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="document.getElementById('writeModal').style.display='none'">×</button>
+            <h2 style="font-family: 'Clash Display'; margin-bottom: 20px; color: var(--secondary);">İçerik Oluştur</h2>
+            
+            <div class="form-group">
+                <label>Başlık</label>
+                <input type="text" placeholder="Çarpıcı bir başlık...">
+            </div>
+            <div class="form-group">
+                <label>Kategori</label>
+                <select>
+                    <option>Teknoloji</option>
+                    <option>Sanat</option>
+                    <option>Spor</option>
+                    <option>Bilim</option>
+                    <option>Kültür</option>
+                    <option>Müzik</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>İçerik</label>
+                <textarea placeholder="Düşüncelerini paylaş..."></textarea>
+            </div>
+            <button class="write-btn" style="width: 100%;" onclick="alert('Yazı inceleme için gönderildi!'); document.getElementById('writeModal').style.display='none'">Yayınla</button>
+        </div>
+    </div>
+
+    <!-- Filtreleme JS -->
+    <script>
+        const navLinks = document.querySelectorAll('.nav-link');
+        const cards = document.querySelectorAll('.card');
+        const searchInput = document.getElementById('searchInput');
+
+        // Yan menü navigasyon ile filtreleme
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Aktif sınıfı güncelle
+                navLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+
+                // Filtreyi al
+                const filter = link.getAttribute('data-filter');
+
+                // Arama kutusunu temizle
+                searchInput.value = '';
+
+                // Kartları filtrele
+                cards.forEach(card => {
+                    const category = card.getAttribute('data-category');
+                    if (filter === 'all' || category === filter) {
+                        card.classList.remove('hidden');
+                    } else {
+                        card.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // Arama kısmı ile filtreleme
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+
+            // Sadece tümü seçili gibi davranalım
+            navLinks.forEach(l => l.classList.remove('active'));
+            navLinks[0].classList.add('active'); // "Başa/All" aktif ediliyor
+
+            cards.forEach(card => {
+                const title = card.querySelector('.card-title') ? card.querySelector('.card-title').textContent.toLowerCase() : '';
+                const desc = card.querySelector('.card-desc') ? card.querySelector('.card-desc').textContent.toLowerCase() : '';
+                const category = card.getAttribute('data-category').toLowerCase();
+                
+                if (title.includes(searchTerm) || desc.includes(searchTerm) || category.includes(searchTerm)) {
+                    card.classList.remove('hidden');
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+            });
+        });
+
+        // Yıldızlar ve Kayan Yıldızlar (Meteorlar) Animasyon Scripti
+        function buildStarfield() {
+            const sf = document.getElementById('sf');
+            // Çok fazla yıldız ekleyelim
+            for(let i = 0; i < 200; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                const sz = Math.random() * 2.5 + 0.5;
+                s.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${(Math.random()*4+1).toFixed(1)}s;animation-delay:${(Math.random()*2).toFixed(1)}s`;
+                sf.appendChild(s);
+            }
+        }
+
+        function shootMeteors() {
+            const sf = document.getElementById('sf');
+            function spawn() {
+                const m = document.createElement('div');
+                m.className = 'mtr';
+                const w = Math.random() * 200 + 100;
+                // Daha hızlı kayan yıldızlar
+                const spd = (Math.random() * 0.8 + 0.4).toFixed(2);
+                const isCyan = Math.random() > 0.5;
+                m.style.cssText = `width:${w}px;left:${Math.random()*120}%;top:${Math.random()*50-10}%;--spd:${spd}s;`
+                    + (isCyan ? 'background:linear-gradient(90deg,var(--secondary),transparent);filter:drop-shadow(0 0 6px var(--secondary));'
+                              : 'background:linear-gradient(90deg,var(--primary),transparent);filter:drop-shadow(0 0 6px var(--primary));');
+                sf.appendChild(m);
+                // Meteor yok et
+                setTimeout(() => m.remove(), spd * 1000 + 200);
+                // Çok daha sık meteor oluştur
+                setTimeout(spawn, Math.random() * 700 + 200);
+            }
+            // Aynı anda 3-4 tane sürekli spawn dongusu baslatalim
+            spawn(); spawn(); spawn();
+        }
+
+        buildStarfield();
+        shootMeteors();
+    </script>
+</body>
+</html>

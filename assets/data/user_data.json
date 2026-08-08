@@ -1,0 +1,45 @@
+{
+  "adSoyad": "Abdurrahman",
+  "bolum": "Bilgisayar Mühendisliği",
+  "sinif": "3. Sınıf",
+  "profilFoto": "assets/yapay_zeka.png",
+  "kullanici_qr_data": "NEWGENC_ABD_41_SAU",
+  "kullanici_rozetleri": [
+    {
+      "rozetAd": "İlk Adım",
+      "ikon": "🌱",
+      "kazanildi": true
+    },
+    {
+      "rozetAd": "Kod Ustası",
+      "ikon": "💻",
+      "kazanildi": true
+    },
+    {
+      "rozetAd": "Topluluk Kaşifi",
+      "ikon": "🔍",
+      "kazanildi": false
+    },
+    {
+      "rozetAd": "Sosyal Kelebek",
+      "ikon": "🦋",
+      "kazanildi": false
+    },
+    {
+      "rozetAd": "Başarı Elçisi",
+      "ikon": "🌟",
+      "kazanildi": true
+    },
+    {
+      "rozetAd": "Vizyon Sahibi",
+      "ikon": "💡",
+      "kazanildi": false
+    }
+  ],
+  "katilinan_etkinlikler": [
+    "assets/yapay_zeka.png",
+    "assets/sau_siber.png",
+    "assets/atom.png",
+    "assets/bilgisayar.png"
+  ]
+}

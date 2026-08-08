@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NevGenç - Oyun Odası 🎮</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #BB86FC;
+            --secondary: #03DAC5;
+            --bg: #0A0E21;
+            --card-bg: rgba(13, 17, 55, 0.7);
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: radial-gradient(circle at center, #1a1f4d 0%, #050816 100%);
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 40px 20px;
+            text-align: center;
+            background: linear-gradient(to bottom, rgba(13, 17, 55, 0.9), transparent);
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+            font-weight: 900;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(187, 134, 252, 0.2);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(187, 134, 252, 0.2);
+        }
+
+        .game-card img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-bottom: 1px solid rgba(187, 134, 252, 0.1);
+        }
+
+        .game-info {
+            padding: 20px;
+        }
+
+        .game-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 0 10px 0;
+            color: white;
+        }
+
+        .game-desc {
+            font-size: 0.9rem;
+            color: #8B8FA3;
+            margin: 0 0 20px 0;
+            line-height: 1.5;
+        }
+
+        .play-btn {
+            display: inline-block;
+            padding: 10px 25px;
+            background: linear-gradient(45deg, var(--primary), #9c27b0);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .neon-glow {
+            position: fixed;
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            filter: blur(150px);
+            border-radius: 50%;
+            opacity: 0.1;
+            z-index: -1;
+            top: -100px;
+            right: -100px;
+            pointer-events: none;
+        }
+
+        .neon-glow-2 {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            background: var(--secondary);
+            filter: blur(120px);
+            border-radius: 50%;
+            opacity: 0.1;
+            z-index: -1;
+            bottom: -50px;
+            left: -50px;
+            pointer-events: none;
+        }
+
+        /* Meteor Shower Background */
+        #meteor-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .meteor {
+            position: absolute;
+            width: 250px;
+            height: 3px;
+            background: linear-gradient(90deg, rgba(187, 134, 252, 1), rgba(3, 218, 197, 0.5), transparent);
+            border-radius: 50%;
+            filter: drop-shadow(0 0 10px var(--primary));
+            opacity: 0;
+            transform: rotate(-35deg);
+            z-index: -2;
+        }
+
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: twinkle var(--duration) infinite alternate;
+        }
+
+        @keyframes shoot {
+            0% {
+                transform: rotate(-35deg) translateX(0) scaleX(0.1);
+                opacity: 0;
+            }
+            20% {
+                opacity: 1;
+                transform: rotate(-35deg) translateX(-200px) scaleX(1);
+            }
+            80% {
+                opacity: 1;
+            }
+            100% {
+                transform: rotate(-35deg) translateX(-1500px) scaleX(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes twinkle {
+            from { opacity: 0.1; transform: scale(1); }
+            to { opacity: 0.6; transform: scale(1.2); }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="neon-glow"></div>
+    <div class="neon-glow-2"></div>
+    <div id="meteor-container"></div>
+
+    <header>
+        <h1>OYUN ODASI</h1>
+        <p style="color: #8B8FA3; margin-top: 10px;">NevGenç Dünyasında Sınırları Zorla</p>
+    </header>
+
+    <div class="container">
+        <!-- Orbit Guardian -->
+        <div class="game-card" onclick="window.location.href='games/orbit_guardian/index.html'">
+            <img src="games/orbit_guardian/thumbnail.png" alt="Orbit Guardian">
+            <div class="game-info">
+                <h2 class="game-title">ORBİT GUARDİAN</h2>
+                <p class="game-desc">Yörüngeyi savun, düşmanları yok et ve galaksinin koruyucusu ol! Hızlı tempolu bir uzay savaşı seni bekliyor.</p>
+                <a href="games/orbit_guardian/index.html" class="play-btn">Hemen Oyna</a>
+            </div>
+        </div>
+
+        <!-- Placeholder for more games -->
+        <div class="game-card" style="opacity: 0.5; cursor: default;">
+            <div style="height: 200px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 3rem;">🚀</span>
+            </div>
+            <div class="game-info">
+                <h2 class="game-title">YENİ OYUN</h2>
+                <p class="game-desc">Çok yakında yeni maceralar eklenecek. Takipte kal!</p>
+                <span class="play-btn" style="background: grey;">Yakında</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function createStars() {
+            const container = document.getElementById('meteor-container');
+            const starCount = 100;
+
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                const size = Math.random() * 2 + 1;
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.left = `${Math.random() * 100}%`;
+                star.style.top = `${Math.random() * 100}%`;
+                star.style.setProperty('--duration', `${Math.random() * 3 + 2}s`);
+                container.appendChild(star);
+            }
+        }
+
+        function spawnMeteor() {
+            const container = document.getElementById('meteor-container');
+            const meteor = document.createElement('div');
+            meteor.className = 'meteor';
+            
+            // Random start position (mostly top right quadrant)
+            const startX = Math.random() * 100 + 30; // 30% to 130% width
+            const startY = Math.random() * 60 - 20;  // -20% to 40% height
+            
+            meteor.style.left = `${startX}%`;
+            meteor.style.top = `${startY}%`;
+            
+            // Random properties
+            const duration = Math.random() * 1.5 + 0.8; // Faster
+            const size = Math.random() * 150 + 150;
+            meteor.style.width = `${size}px`;
+            
+            // Variety in color
+            if (Math.random() > 0.5) {
+                meteor.style.filter = 'drop-shadow(0 0 12px var(--secondary))';
+                meteor.style.background = 'linear-gradient(90deg, var(--secondary), transparent)';
+            }
+            
+            meteor.style.animation = `shoot ${duration}s cubic-bezier(0.4, 0, 0.2, 1) forwards`;
+            
+            container.appendChild(meteor);
+            
+            // Clean up
+            setTimeout(() => {
+                meteor.remove();
+            }, duration * 1000);
+
+            // Schedule next meteor - more frequent
+            setTimeout(spawnMeteor, Math.random() * 1500 + 500);
+        }
+
+        createStars();
+        spawnMeteor();
+    </script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+:root {
+    --bg-dark: #05060A;
+    --bg-mid: #0B0D17;
+    --neon-purple: #B026FF;
+    --electric-blue: #00F0FF;
+    --cyber-pink: #FF003C;
+    --text-main: #FFFFFF;
+    --text-muted: #D1D5DB;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: radial-gradient(circle at center, var(--bg-mid) 0%, var(--bg-dark) 100%);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+}
+
+#stardust { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+
+.slider-wrapper { position: relative; z-index: 10; width: 100%; height: 100vh; display: flex; align-items: center; }
+
+.slider-container {
+    width: 100%; overflow-x: auto; overflow-y: hidden;
+    scroll-snap-type: x mandatory; scroll-behavior: smooth;
+    scrollbar-width: none; -ms-overflow-style: none;
+    perspective: 1200px; padding: 20vh 50vw; 
+}
+.slider-container::-webkit-scrollbar { display: none; }
+
+.slider-track { display: flex; align-items: center; gap: 40px; }
+
+/* KART GENEL */
+.habitat-card {
+    position: relative; width: 320px; height: 480px; flex-shrink: 0;
+    scroll-snap-align: center;
+    border-radius: 30px;
+    overflow: hidden; /* Dışarı taşanları gizle */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    display: flex; flex-direction: column;
+    justify-content: flex-start;
+    align-items: center; text-align: center;
+    animation: float_card 6s ease-in-out infinite;
+    transform-style: preserve-3d; will-change: transform, opacity;
+    border: 2px solid rgba(255,255,255,0.1);
+    transition: border-color 0.4s;
+    background-color: #111; /* Resim yüklenene kadar koyu arka plan */
+}
+
+@keyframes float_card {
+    0% { top: 0px; }
+    50% { top: -15px; }
+    100% { top: 0px; }
+}
+
+/* HABITAT GERÇEK FOTOĞRAF ARKA PLANI */
+.habitat-bg { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; 
+    background-size: cover;
+    background-position: center;
+    /* Resmi biraz karartarak yazının okunmasını sağla */
+    filter: brightness(0.6) contrast(1.1);
+}
+
+.card-content { 
+    position: relative; z-index: 10; width: 100%; height: 100%; 
+    padding: 30px 20px; display: flex; flex-direction: column; 
+    justify-content: space-between; 
+}
+
+/* HAYVANLARIN ARKASINDAN ÇIKACAĞI GERÇEKÇİ ÖN KATMAN (SİS/GÖLGE) */
+.habitat-foreground { 
+    position: absolute; bottom: 0; left: 0; width: 100%; height: 160px; z-index: 5; 
+    background: linear-gradient(to top, rgba(0,0,0,1) 10%, rgba(0,0,0,0.8) 50%, transparent 100%);
+    pointer-events: none;
+}
+
+/* HAYVAN ANİMASYONLARI (Daha büyük ve daha çok çıkıyor) */
+.animal-container {
+    position: absolute;
+    bottom: 30px; /* Biraz daha yukarı aldık */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4; /* Sis/Gölge gradyanının biraz arkasında kalsın */
+}
+
+.animal-emoji {
+    font-size: 7rem; /* Çok daha belirgin ve büyük */
+    line-height: 1;
+    transform: translateY(150px); /* Başlangıçta tamamen sis/gölgenin altında gömülü */
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    /* Gerçek fotoğrafın üstünde kendini belli edecek devasa gölge */
+    filter: drop-shadow(0 15px 25px rgba(0,0,0,0.9)) drop-shadow(0 0 10px rgba(255,255,255,0.2));
+}
+
+/* Kart aktif olunca o kocaman emoji havaya epeyce çıkacak */
+.habitat-card.active-card .animal-emoji {
+    transform: translateY(-20px) rotate(5deg);
+    animation: look-around 5s infinite 1s;
+}
+
+@keyframes look-around {
+    0%, 100% { transform: translateY(-20px) rotate(5deg); }
+    10% { transform: translateY(-20px) rotate(-5deg); }
+    20% { transform: translateY(-20px) rotate(5deg); }
+    80% { transform: translateY(-20px) rotate(5deg); }
+    90% { transform: translateY(-20px) rotate(-5deg); }
+}
+
+/* AKTİF KART VE NEON GLOW */
+.card-glow { 
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+    border-radius: 30px; box-shadow: inset 0 0 0 rgba(0, 240, 255, 0.0); 
+    transition: box-shadow 0.4s; pointer-events: none; z-index: 15; 
+}
+.habitat-card.active-card { 
+    border-color: rgba(255, 255, 255, 0.6); 
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9), 0 0 30px rgba(255,255,255,0.2); 
+}
+.habitat-card.active-card .card-glow { box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.1); }
+
+/* HEADER */
+.card-header { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.day-label { 
+    font-size: 1.2rem; font-weight: 700; color: rgba(255,255,255,0.6); 
+    text-transform: uppercase; transition: color 0.3s; 
+    text-shadow: 0 4px 6px rgba(0,0,0,0.8); 
+}
+.habitat-card.active-card .day-label { color: #FFF; }
+.streak-badge { 
+    background: rgba(0,0,0,0.6); padding: 5px 12px; border-radius: 20px; 
+    display: flex; align-items: center; gap: 6px; font-size: 0.8rem; 
+    font-weight: 500; border: 1px solid rgba(255, 255, 255, 0.2); 
+}
+.streak-badge.active { border-color: #FFD700; color: #FFF; box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+
+/* COUNTER DISPLAY */
+.counter-display { margin-bottom: 20px; text-shadow: 0 4px 10px rgba(0,0,0,0.9); }
+.counter-label { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 2px; color: #FFF; margin-bottom: 5px; }
+.neon-number { font-size: 4.5rem; font-weight: 900; line-height: 1; color: #FFF; transition: all 0.3s; }
+.habitat-card.active-card .neon-number { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)); }
+.neon-number.pop { transform: scale(1.3); }
+
+.task-draft-text { 
+    font-size: 1.1rem; color: #FFF; line-height: 1.4; margin-top: 10px; 
+    background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; 
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.neon-text { font-weight: 700; color: var(--electric-blue); }
+
+/* ACTION AREA */
+.action-area { display: flex; flex-direction: column; align-items: center; gap: 10px; min-height: 110px; z-index: 20; }
+.neon-btn {
+    position: relative; width: 65px; height: 65px; border-radius: 50%; border: none;
+    background: #FFF; color: #000; font-size: 2.5rem; font-weight: 300; 
+    display: flex; justify-content: center; align-items: center;
+    cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.8); transition: all 0.2s;
+}
+.neon-btn:hover { transform: scale(1.1); }
+.neon-btn:active { transform: scale(0.95); }
+
+/* GEÇMİŞ / GELECEK GÖRÜNÜMLERİ */
+.habitat-card.past .neon-btn, .habitat-card.future .neon-btn { display: none; }
+.habitat-card.past .action-hint, .habitat-card.future .action-hint { display: none; }
+.habitat-card.future .neon-number { display: none; }
+.habitat-card.future .counter-label { display: none; }
+.habitat-card.future .task-draft-text { display: block !important; }
+
+/* BUGÜNE DÖN BUTONU */
+.float-btn {
+    position: fixed; bottom: -60px; left: 50%; transform: translateX(-50%);
+    background: rgba(255,255,255,0.15); backdrop-filter: blur(15px);
+    border: 1px solid rgba(255,255,255,0.3); color: #FFF;
+    padding: 12px 24px; border-radius: 30px; font-size: 1rem; font-weight: 700;
+    font-family: inherit; cursor: pointer; z-index: 100;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+    transition: bottom 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.3s;
+}
+.float-btn.visible { bottom: 30px; }
+.float-btn:hover { background: rgba(255,255,255,0.3); }
+
+.action-hint { font-size: 0.8rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.9); }
+.status-message { 
+    font-size: 0.8rem; color: #FFF; font-weight: 500; opacity: 0; 
+    transition: opacity 0.3s; height: 16px; background: rgba(0,0,0,0.7); 
+    padding: 2px 10px; border-radius: 10px;
+}
+.status-message.show { opacity: 1; }
+
+.floating-particle { position: absolute; border-radius: 50%; z-index: 100; animation: float-up 1s ease-out forwards; pointer-events: none;}
+@keyframes float-up { 0% { opacity: 1; transform: translate(0, 0) scale(1); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0); } }
+
+@media (max-width: 480px) { .habitat-card { width: 280px; height: 440px; } .float-btn { padding: 10px 20px; font-size: 0.9rem;} }

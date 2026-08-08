@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GNÇ New — Blog Detay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Outfit:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030510;
+            --surface: rgba(15, 18, 45, 0.6);
+            --primary: #9d4edd;
+            --secondary: #00f5d4;
+            --accent: #fee440;
+            --text: #f8f9fa;
+            --muted: #adb5bd;
+            --border: rgba(157, 78, 221, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(157, 78, 221, 0.15), transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(0, 245, 212, 0.1), transparent 40%);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--secondary);
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 40px;
+            padding: 10px 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            transition: 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(0, 245, 212, 0.1);
+            transform: translateX(-5px);
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 6px 15px;
+            background: rgba(157, 78, 221, 0.2);
+            border: 1px solid var(--primary);
+            border-radius: 20px;
+            color: var(--primary);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+
+        .article-title {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 3.5rem;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff, #adb5bd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            color: var(--muted);
+            margin-bottom: 50px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .author-pic {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: var(--bg);
+            font-size: 1.2rem;
+        }
+
+        .hero-emoji {
+            font-size: 10rem;
+            text-align: center;
+            margin-bottom: 50px;
+            animation: float 6s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .article-content {
+            font-size: 1.15rem;
+            color: #d1d5db;
+        }
+
+        .article-content p {
+            margin-bottom: 25px;
+        }
+
+        .article-content h3 {
+            font-family: 'Clash Display', sans-serif;
+            font-size: 2rem;
+            color: white;
+            margin: 40px 0 20px;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(0, 245, 212, 0.1), transparent);
+            border-left: 4px solid var(--secondary);
+            padding: 25px;
+            border-radius: 0 20px 20px 0;
+            margin: 40px 0;
+            font-style: italic;
+            font-size: 1.2rem;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <a href="index.html" class="back-btn">← Ana Sayfaya Dön</a>
+
+        <div class="category-badge">Gündem / Teknoloji</div>
+        
+        <h1 class="article-title">Yapay Zeka Çağında Gençlik: Adaptasyon Süreci ve Gelecek Vizyonu</h1>
+        
+        <div class="article-meta">
+            <div class="author-pic">AK</div>
+            <div>
+                <div style="color: white; font-weight: 600;">Ayşe Kaya</div>
+                <div>20 Nis 2026 • 8 dk okuma</div>
+            </div>
+        </div>
+
+        <div class="hero-emoji">🚀</div>
+
+        <div class="article-content">
+            <p>Yapay zeka (YZ) sistemleri artık sadece bilim kurgu filmlerinin konusu değil, günlük hayatımızın tam merkezinde yer alıyor. Eğitimden kariyere, sanattan sosyal ilişkilere kadar her şeyi yeniden şekillendiren bu teknoloji karşısında gençler olarak nasıl bir duruş sergilemeliyiz?</p>
+
+            <p>Birçoğumuz yapay zekanın mesleklerimizi elimizden almasından endişe ediyoruz. Ancak tarih boyunca her büyük teknolojik devrim, yok ettiği mesleklerden daha fazlasını yaratmıştır. Asıl mesele, bu yeni döneme ne kadar hızlı ayak uydurabileceğimizdir.</p>
+
+            <h3>Değişime Direnmek Yerine Yönetmek</h3>
+
+            <p>Yapay zeka araçlarını bir rakip olarak değil, bir "ortak" (copilot) olarak görmek paradigma değişiminin ilk adımıdır. Kod yazarken, tasarım yaparken veya araştırma hazırlarken bu araçları kullanabilen bireyler, kullanamayanların önüne geçecektir.</p>
+
+            <div class="highlight-box">
+                "Gelecekte yapay zeka sizin işinizi elinizden almayacak. İşinizi, yapay zekayı sizden daha iyi kullanan biri elinizden alacak."
+            </div>
+
+            <p>Bunun için sadece teknik beceriler (kodlama, veri analizi) değil, "Soft Skills" adını verdiğimiz yumuşak beceriler de kritik önem taşıyor. Empati, yaratıcı problem çözme, etik karar verme ve liderlik gibi insan odaklı yetenekler yapay zeka tarafından taklit edilemez.</p>
+
+            <h3>Topluluk Olarak Ne Yapmalıyız?</h3>
+
+            <p>GNÇ Topluluğu olarak bu dönüşümü bireysel olarak değil, birlikte göğüslemeliyiz. Deneyimlerimizi paylaşmalı, yeni araçları birlikte denemeli ve birbirimize mentorluk yapmalıyız. Kurduğumuz alt çalışma grupları (yapay zeka kulübü, veri bilimi atölyesi) bu vizyonun somut adımlarıdır.</p>
+
+            <p>Gelecek, onu anlayan ve ona şekil verenlerin olacaktır. Adaptasyon süreci bugün başlıyor.</p>
+        </div>
+    </div>
+
+</body>
+</html>

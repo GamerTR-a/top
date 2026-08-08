@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serdivan Akıllı Harita</title>
+
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet.js Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Custom Style CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+            <header class="app-header">
+                <div class="logo-area">
+                    <span class="icon-pulse"><i class="fa-solid fa-graduation-cap"></i></span>
+                    <div class="title-sub">
+                        <h1>Serdivan Yurt-Kampüs</h1>
+                        <span class="version-tag">Öğrenci Ulaşım Rehberi</span>
+                    </div>
+                </div>
+                <!-- Dorm Selection Wizard dropdown -->
+                <div class="dorm-selector-container">
+                    <label for="dorm-select"><i class="fa-solid fa-map-pin"></i> Kalacağınız KYK Yurdunu Seçin:</label>
+                    <select id="dorm-select">
+                        <option value="">Tüm Konumları Göster (Filtresiz)</option>
+                    </select>
+                </div>
+            </header>
+
+            <!-- Search Area -->
+            <div class="search-container">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="poi-search" placeholder="Yurt, durak, rota veya kafe ara..." autocomplete="off">
+                <button id="clear-search" class="clear-btn" style="display: none;"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Category Filter Pills -->
+            <div class="categories-filter">
+                <button class="filter-pill active" data-category="all">
+                    <i class="fa-solid fa-border-all"></i> Hepsi
+                </button>
+                <button class="filter-pill" data-category="dorms">
+                    <i class="fa-solid fa-hotel"></i> Yurtlar (KYK)
+                </button>
+                <button class="filter-pill" data-category="transport">
+                    <i class="fa-solid fa-bus"></i> Ulaşım & Hatlar
+                </button>
+                <button class="filter-pill" data-category="study">
+                    <i class="fa-solid fa-graduation-cap"></i> Kütüphane & Kafe
+                </button>
+                <button class="filter-pill" data-category="wifi">
+                    <i class="fa-solid fa-wifi"></i> Ücretsiz Wi-Fi
+                </button>
+                <button class="filter-pill" data-category="routes">
+                    <i class="fa-solid fa-bicycle"></i> Rotalar
+                </button>
+            </div>
+
+            <!-- Places / Routes List Container -->
+            <div class="list-section">
+                <h3 class="section-title">Konumlar & Rotalar (<span id="results-count">0</span>)</h3>
+                <div id="pois-list" class="pois-list">
+                    <!-- Dynamic Items will be rendered here by JS -->
+                </div>
+            </div>
+
+            <!-- Details Display Pane (Glassmorphic Slide-in Panel) -->
+            <div id="details-pane" class="details-pane">
+                <div class="details-content-wrapper">
+                    <button id="close-details" class="close-details-btn"><i
+                            class="fa-solid fa-chevron-down"></i></button>
+                    <div id="details-body">
+                        <!-- Clicked element details will slide up here -->
+                        <div class="details-placeholder">
+                            <i class="fa-solid fa-info-circle"></i>
+                            <p>Detayları görmek için haritadan veya listeden bir yer seçin.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="map-wrapper">
+            <div id="map"></div>
+
+            <!-- Floating Map Actions -->
+            <div class="map-floating-actions">
+                <button id="find-my-location" title="Konumumu Bul"><i class="fa-solid fa-location-crosshairs"></i></button>
+                <button id="toggle-theme" title="Karanlık / Aydınlık Tema"><i class="fa-solid fa-moon"></i></button>
+                <button id="recenter-map" title="Haritayı Merkezle"><i class="fa-solid fa-crosshairs"></i></button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Leaflet JS Library -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Data Source -->
+    <script src="data.js"></script>
+
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>

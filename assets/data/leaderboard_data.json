@@ -1,0 +1,20 @@
+{
+  "liderlik_tablosu": {
+    "haftanin_topluluklari": [
+      { "ad": "SAÜ Blockchain", "logo": "assets/blokchain.png", "puan": 1250, "siralama": 1, "trend": "up" },
+      { "ad": "Yapay Zeka", "logo": "assets/yapay_zeka.png", "puan": 1150, "siralama": 2, "trend": "stable" },
+      { "ad": "SAÜ Siber", "logo": "assets/sau_siber.png", "puan": 980, "siralama": 3, "trend": "down" },
+      { "ad": "Atom Topluluğu", "logo": "assets/atom.png", "puan": 850, "siralama": 4, "trend": "up" },
+      { "ad": "Bilgisayar", "logo": "assets/bilgisayar.png", "puan": 720, "siralama": 5, "trend": "stable" },
+      { "ad": "SEIS", "logo": "assets/seis.png", "puan": 610, "siralama": 6, "trend": "up" }
+    ],
+    "haftanin_uyeler": [
+      { "ad": "Abdurrahman", "foto": "assets/yapay_zeka.png", "puan": 3200, "rozet": 5, "siralama": 1, "trend": "up" },
+      { "ad": "Zeynep", "foto": "assets/atom.png", "puan": 2900, "rozet": 4, "siralama": 2, "trend": "stable" },
+      { "ad": "Mehmet", "foto": "assets/altay.png", "puan": 2750, "rozet": 4, "siralama": 3, "trend": "up" },
+      { "ad": "Elif", "foto": "assets/biandora.jpg", "puan": 2400, "rozet": 3, "siralama": 4, "trend": "down" },
+      { "ad": "Mert", "foto": "assets/bsmt.png", "puan": 2100, "rozet": 3, "siralama": 5, "trend": "stable" },
+      { "ad": "Selin", "foto": "assets/seis.png", "puan": 1950, "rozet": 2, "siralama": 6, "trend": "up" }
+    ]
+  }
+}

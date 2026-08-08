@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NevGenç - Kitap Okuma Kulübü 📚</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #FFD700;
+            --secondary: #FF8C00;
+            --bg: #0A0A10;
+            --card-bg: rgba(20, 20, 30, 0.75);
+            --text: #F0F0F0;
+            --text-muted: #A0A0A0;
+            --glass: rgba(255, 215, 0, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            overflow-x: hidden;
+            background: radial-gradient(circle at top, #1a1505 0%, #050508 100%);
+            min-height: 100vh;
+        }
+
+        /* Background Animation */
+        #particles {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            filter: blur(1px);
+            opacity: 0;
+            animation: float 10s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(100vh) scale(0); opacity: 0; }
+            20% { opacity: 0.8; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) scale(2); opacity: 0; }
+        }
+
+        header {
+            padding: 50px 20px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            margin: 0;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-top: 10px;
+            font-weight: 300;
+        }
+
+        /* Filter Tabs */
+        .filters {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 20px 40px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            color: var(--primary);
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary);
+            color: var(--bg);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Grid Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 60px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .book-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 25px;
+            border: 1px solid rgba(255, 215, 0, 0.15);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+            animation: fadeIn 0.5s ease backwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .book-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--secondary);
+            box-shadow: 0 10px 30px rgba(255, 140, 0, 0.2);
+        }
+
+        /* Card Header */
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .book-icon {
+            font-size: 2.5rem;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .book-score {
+            background: rgba(255, 215, 0, 0.2);
+            color: var(--primary);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .book-title {
+            font-size: 1.5rem;
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .book-author {
+            color: var(--primary);
+            font-size: 0.95rem;
+            margin-bottom: 15px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        .tags {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tag.hot {
+            background: rgba(255, 69, 0, 0.15);
+            color: #FF6347;
+            border-color: rgba(255, 69, 0, 0.3);
+        }
+
+        .quote-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 3px solid var(--primary);
+            padding: 15px;
+            border-radius: 0 10px 10px 0;
+            margin-bottom: 25px;
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .quote-box::before {
+            content: """;
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            font-size: 3rem;
+            color: rgba(255, 215, 0, 0.1);
+            font-family: 'Playfair Display', serif;
+        }
+
+        .quote-text {
+            font-style: italic;
+            font-size: 0.95rem;
+            color: #E2E2E2;
+            line-height: 1.6;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vote-btn {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--primary);
+            padding: 8px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.3s;
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+
+        .vote-btn:hover {
+            background: var(--primary);
+            color: var(--bg);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .vote-btn.voted {
+            background: var(--secondary);
+            border-color: var(--secondary);
+            color: white;
+            box-shadow: 0 0 15px var(--secondary);
+        }
+    </style>
+</head>
+<body>
+    <div id="particles"></div>
+
+    <header>
+        <h1>Kitap Okuma Kulübü</h1>
+        <p class="subtitle">Türk Edebiyatı'nın en iyi eserleri, çarpıcı alıntılar ve topluluk tavsiyeleri.</p>
+    </header>
+
+    <div class="filters" id="filter-container">
+        <button class="filter-btn active" data-filter="all">Tümü</button>
+        <button class="filter-btn" data-filter="Roman">Roman</button>
+        <button class="filter-btn" data-filter="Klasik">Klasik</button>
+        <button class="filter-btn" data-filter="Psikoloji">Psikoloji</button>
+        <button class="filter-btn" data-filter="Tarih">Tarih</button>
+    </div>
+
+    <div class="container" id="books-container">
+        <!-- Books will be loaded here dynamically -->
+    </div>
+
+    <script>
+        // Particles Animation
+        const particlesContainer = document.getElementById('particles');
+        for (let i = 0; i < 50; i++) {
+            const particle = document.createElement('div');
+            particle.classList.add('particle');
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.animationDuration = (Math.random() * 10 + 5) + 's';
+            particle.style.animationDelay = (Math.random() * 5) + 's';
+            particlesContainer.appendChild(particle);
+        }
+
+        // Book Data
+        const books = [
+            {
+                id: 1,
+                title: "Tutunamayanlar",
+                author: "Oğuz Atay",
+                categories: ["Roman", "Psikoloji"],
+                quote: "Ben iç dünyama dönüyorum. Orada hayal kırıklığına yer yok.",
+                score: 9.8,
+                votes: 1450,
+                isHot: true
+            },
+            {
+                id: 2,
+                title: "Saatleri Ayarlama Enstitüsü",
+                author: "Ahmet Hamdi Tanpınar",
+                categories: ["Roman", "Klasik", "Tarih"],
+                quote: "Fakat ne yapsın ki, saatin kendisi mekan, yürüyüşü zaman, ayarı insandır.",
+                score: 9.6,
+                votes: 1230,
+                isHot: true
+            },
+            {
+                id: 3,
+                title: "Kürk Mantolu Madonna",
+                author: "Sabahattin Ali",
+                categories: ["Roman", "Klasik"],
+                quote: "Dünyada bana hiçbir şey, tabiattan melül bir insanın zoraki gülümsemesi kadar acı gelmemiştir.",
+                score: 9.7,
+                votes: 2100,
+                isHot: true
+            },
+            {
+                id: 4,
+                title: "Puslu Kıtalar Atlası",
+                author: "İhsan Oktay Anar",
+                categories: ["Roman", "Tarih"],
+                quote: "Dünyanın kendisi bir rüya olduğuna göre, rüya içinde rüya görmek, uyanmaya doğru atılmış bir adımdır.",
+                score: 9.5,
+                votes: 890,
+                isHot: false
+            },
+            {
+                id: 5,
+                title: "İnce Memed",
+                author: "Yaşar Kemal",
+                categories: ["Roman", "Klasik"],
+                quote: "İnsan dediğin bir büyük derya, ne dibi bulunur, ne kıyısı...",
+                score: 9.4,
+                votes: 1120,
+                isHot: false
+            },
+            {
+                id: 6,
+                title: "Aylak Adam",
+                author: "Yusuf Atılgan",
+                categories: ["Roman", "Psikoloji"],
+                quote: "Sustu. Konuşmak gereksizdi. Bundan sonra kimseye ondan bahsetmeyecekti. Biliyordu; anlamazlardı.",
+                score: 9.2,
+                votes: 760,
+                isHot: false
+            }
+        ];
+
+        let votedBooks = new Set();
+
+        const container = document.getElementById('books-container');
+
+        function renderBooks(filter = 'all') {
+            container.innerHTML = '';
+            
+            const filtered = filter === 'all' 
+                ? books 
+                : books.filter(b => b.categories.includes(filter));
+
+            filtered.sort((a, b) => b.score - a.score).forEach((book, index) => {
+                const isVoted = votedBooks.has(book.id);
+                const currentScore = isVoted ? (book.score + 0.1).toFixed(1) : book.score.toFixed(1);
+
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.style.animationDelay = `${index * 0.1}s`;
+
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="book-icon">📖</div>
+                        <div class="book-score" id="score-${book.id}">⭐ ${currentScore}</div>
+                    </div>
+                    <div class="book-title">${book.title}</div>
+                    <div class="book-author">${book.author}</div>
+                    <div class="tags">
+                        ${book.isHot ? '<span class="tag hot">🔥 Popüler</span>' : ''}
+                        ${book.categories.map(c => `<span class="tag">${c}</span>`).join('')}
+                    </div>
+                    <div class="quote-box">
+                        <div class="quote-text">"${book.quote}"</div>
+                    </div>
+                    <div class="card-footer">
+                        <button class="vote-btn ${isVoted ? 'voted' : ''}" onclick="toggleVote(${book.id}, this)">
+                            ${isVoted ? 'Tavsiye Ettin ✓' : 'Tavsiye Et 💡'}
+                        </button>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">${book.votes + (isVoted ? 1 : 0)} oy</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        window.toggleVote = function(id, btnElement) {
+            const book = books.find(b => b.id === id);
+            if (!book) return;
+
+            const scoreElement = document.getElementById(`score-${id}`);
+            const votesElement = btnElement.nextElementSibling;
+
+            if (votedBooks.has(id)) {
+                votedBooks.delete(id);
+                btnElement.classList.remove('voted');
+                btnElement.innerHTML = 'Tavsiye Et 💡';
+                scoreElement.innerHTML = `⭐ ${book.score.toFixed(1)}`;
+                votesElement.innerHTML = `${book.votes} oy`;
+            } else {
+                votedBooks.add(id);
+                btnElement.classList.add('voted');
+                btnElement.innerHTML = 'Tavsiye Ettin ✓';
+                scoreElement.innerHTML = `⭐ ${(book.score + 0.1).toFixed(1)}`;
+                votesElement.innerHTML = `${book.votes + 1} oy`;
+            }
+        };
+
+        // Filter Logic
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                renderBooks(e.target.getAttribute('data-filter'));
+            });
+        });
+
+        // Initial Render
+        renderBooks();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+storePassword=SİFRENİZİ_GİRİN
+keyPassword=SİFRENİZİ_GİRİN
+keyAlias=newgenc
+storeFile=../newgenc-release.jks
