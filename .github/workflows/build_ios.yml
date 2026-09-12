@@ -21,7 +21,8 @@ jobs:
           cache: true
 
       - name: Install Dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
 
       - name: Install App Store Connect API Key
         env:
@@ -35,14 +36,19 @@ jobs:
             cp AuthKey_8NRWS5B4GM.p8 ~/.appstoreconnect/private_keys/AuthKey_8NRWS5B4GM.p8
           fi
 
-      - name: Build iOS IPA & Archive
+      - name: Build iOS IPA & XCArchive
         run: |
           flutter build ipa --release \
             --build-name=1.0.25 \
-            --build-number=26
+            --build-number=26 \
+            --no-codesign || flutter build ios --release --no-codesign
 
-      - name: Upload IPA Artifact
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: NevGenc-iOS-v1.0.25
-          path: build/ios/ipa/*.ipa
+          path: |
+            build/ios/ipa/*.ipa
+            build/ios/archive/*.xcarchive
+            build/ios/iphoneos/*.app
+
