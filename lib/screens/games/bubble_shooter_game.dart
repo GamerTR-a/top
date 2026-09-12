@@ -151,6 +151,24 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
     return out;
   }
 
+  // ---------- Yardımcı: tahtadaki aktif renkler ----------
+
+  List<int> _activeColorsOnBoard() {
+    final colors = <int>{};
+    for (final row in _grid) {
+      for (final v in row) {
+        if (v != 0) colors.add(v);
+      }
+    }
+    return colors.toList()..sort();
+  }
+
+  int _pickRandomActiveColor() {
+    final active = _activeColorsOnBoard();
+    if (active.isEmpty) return 1; // fallback
+    return active[_rng.nextInt(active.length)];
+  }
+
   // ---------- Oyun akışı ----------
 
   void _generateBoard() {
@@ -169,6 +187,14 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
 
   void _startGame() {
     _computeGeometry();
+    _generateBoard();
+    final activeColors = _activeColorsOnBoard();
+    final firstColor = activeColors.isNotEmpty
+        ? activeColors[_rng.nextInt(activeColors.length)]
+        : 1 + _rng.nextInt(_colorsInPlay);
+    final nextColor = activeColors.isNotEmpty
+        ? activeColors[_rng.nextInt(activeColors.length)]
+        : 1 + _rng.nextInt(_colorsInPlay);
     setState(() {
       _level = 1;
       _colorsInPlay = 4;
@@ -179,14 +205,21 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
       _won = false;
       _flying = null;
       _aim = null;
-      _curColor = 1 + _rng.nextInt(_colorsInPlay);
-      _nextColor = 1 + _rng.nextInt(_colorsInPlay);
-      _generateBoard();
+      _curColor = firstColor;
+      _nextColor = nextColor;
       _running = true;
     });
   }
 
   void _nextLevel() {
+    _generateBoard();
+    final activeColors = _activeColorsOnBoard();
+    final firstColor = activeColors.isNotEmpty
+        ? activeColors[_rng.nextInt(activeColors.length)]
+        : 1 + _rng.nextInt(_colorsInPlay);
+    final nextColor = activeColors.isNotEmpty
+        ? activeColors[_rng.nextInt(activeColors.length)]
+        : 1 + _rng.nextInt(_colorsInPlay);
     setState(() {
       _level++;
       if (_colorsInPlay < _palette.length) _colorsInPlay++;
@@ -196,9 +229,8 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
       _won = false;
       _flying = null;
       _aim = null;
-      _curColor = 1 + _rng.nextInt(_colorsInPlay);
-      _nextColor = 1 + _rng.nextInt(_colorsInPlay);
-      _generateBoard();
+      _curColor = firstColor;
+      _nextColor = nextColor;
       _running = true;
     });
   }
@@ -222,7 +254,8 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
       _flying = _Ball(launcher, dir * _ballSpeed, _curColor);
       _aim = null;
       _curColor = _nextColor;
-      _nextColor = 1 + _rng.nextInt(_colorsInPlay);
+      // Sıradaki renk: tahtada hala kalan renklerden biri
+      _nextColor = _pickRandomActiveColor();
     });
   }
 

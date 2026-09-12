@@ -2,7 +2,9 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { fileTypeFromBuffer } = require('file-type');
 const { dbRun, dbGet, dbAll } = require('../config/database');
 const { requireAuth, requireOwnerOrAdmin } = require('../middleware/auth');
 const { handleValidation } = require('../middleware/errorHandler');
@@ -30,6 +32,18 @@ const upload = multer({
     }
   },
 });
+
+// Magic bytes doğrulaması - dosya içeriği MIME tipiyle eşleşmeli
+async function validateFileMagicBytes(filePath, expectedMime) {
+  try {
+    const buffer = fs.readFileSync(filePath).subarray(0, 32);
+    const type = await fileTypeFromBuffer(buffer);
+    if (!type) return false;
+    return type.mime === expectedMime;
+  } catch {
+    return false;
+  }
+}
 
 // GET /v1/users/:id
 router.get('/:id', requireAuth, async (req, res, next) => {
@@ -88,6 +102,12 @@ router.post('/:id/avatar', requireAuth, requireOwnerOrAdmin('id'), (req, res, ne
     }
     if (!req.file) return res.status(400).json({ success: false, error: { code: 'NO_FILE', message: 'Dosya gerekli.' } });
     try {
+      // Magic bytes doğrulaması - yüklenen dosya gerçekten resim mi?
+      const isValid = await validateFileMagicBytes(req.file.path, req.file.mimetype);
+      if (!isValid) {
+        fs.unlinkSync(req.file.path); // Geçersiz dosyayı sil
+        return res.status(400).json({ success: false, error: { code: 'INVALID_FILE_CONTENT', message: 'Dosya içeriği MIME tipiyle eşleşmiyor.' } });
+      }
       const url = `/uploads/avatars/${req.file.filename}`;
       await dbRun('UPDATE users SET profile_photo = ? WHERE id = ?', [url, req.params.id]);
       res.json({ success: true, data: { avatarUrl: url } });
@@ -168,11 +188,4 @@ router.delete('/:id/calendar-notes/:noteId', requireAuth, requireOwnerOrAdmin('i
   } catch (err) { next(err); }
 });
 
-// DELETE /v1/users/:id
-router.delete('/:id', requireAuth, requireOwnerOrAdmin('id'), async (req, res, next) => {
-  try {
-    await dbRun('DELETE FROM users WHERE id = ?', [req.params.id]);
-    res.status(204).end();
-  } catch (err) { next(err); }
-});
 module.exports = router;

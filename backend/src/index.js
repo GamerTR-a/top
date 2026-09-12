@@ -29,30 +29,77 @@ const server = http.createServer(app);
 // Güven ayarı (proxy arkasında)
 app.set('trust proxy', 1);
 
-// Güvenlik başlıkları
+// Güvenlik başlıkları - Helmet yapılandırması
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'same-site' },
+  // HSTS - HTTPS zorunluluğu (production'da aktif)
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  // CSP - Report-only modunda başla, sonra enforce et
   contentSecurityPolicy: {
+    reportOnly: process.env.NODE_ENV !== 'production',
     directives: {
-      defaultSrc: ["'none'"],
-      imgSrc: ["'self'", 'data:'],
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      reportUri: process.env.CSP_REPORT_URI || null,
     },
   },
+  // Referrer Policy
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  // Permissions Policy - hassas API'leri kısıtla
+  permissionsPolicy: {
+    features: {
+      camera: [],
+      microphone: [],
+      geolocation: [],
+      payment: [],
+      usb: [],
+      accelerometer: [],
+      gyroscope: [],
+      magnetometer: [],
+    },
+  },
+  // X-Frame-Options (helmet default: DENY)
+  frameguard: { action: 'deny' },
+  // X-Content-Type-Options (helmet default: nosniff)
+  noSniff: true,
+  // X-DNS-Prefetch-Control
+  dnsPrefetchControl: { allow: false },
+  // X-Download-Options
+  ieNoOpen: true,
+  // X-Permitted-Cross-Domain-Policies
+  permittedCrossDomainPolicies: { policy: 'none' },
 }));
 
-// CORS — izin verilen originler .env'den gelir
+// CORS — izin verilen originler .env'den gelir (localhost wildcard KALDIRILDI)
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:8080')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return cb(null, true);
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     cb(new Error('CORS politikası ihlali'));
   },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400, // 24 saat preflight cache
+};
+
+app.use(cors(corsOptions));
 
 // Body parsers
 app.use(express.json({ limit: '5mb' }));
@@ -66,7 +113,7 @@ app.use('/uploads', (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, '../uploads'), { dotfiles: 'deny' }));
 
-// Rate limiting
+// Rate limiting - Genel limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -74,14 +121,57 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla istek. Lütfen bekleyin.' } },
 });
+
+// Auth endpoint'leri için özel limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla giriş denemesi. 15 dakika bekleyin.' } },
 });
+
+// Şifre sıfırlama endpoint'leri için özel limiter
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla şifre sıfırlama isteği. 1 saat bekleyin.' } },
+});
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla şifre sıfırlama denemesi. 1 saat bekleyin.' } },
+});
+
+// Token yenileme için limiter
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla token yenileme denemesi. 15 dakika bekleyin.' } },
+});
+
+// Admin broadcast için limiter
+const adminBroadcastLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla broadcast gönderimi. 1 saat bekleyin.' } },
+});
+
+// Dosya yükleme için limiter
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla dosya yükleme denemesi. 1 saat bekleyin.' } },
 });
 
@@ -112,10 +202,12 @@ app.use(serverError);
 const io = new Server(server, {
   cors: {
     origin: (origin, cb) => {
-      if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return cb(null, true);
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
       cb(new Error('CORS politikası ihlali'));
     },
     credentials: true,
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   },
 });
 

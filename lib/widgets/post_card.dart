@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/post_model.dart';
+import '../services/supabase_data_service.dart';
 import '../theme/app_theme.dart';
 import 'app_network_image.dart';
+
 
 class PostCard extends StatefulWidget {
   final PostModel post;
@@ -23,6 +25,8 @@ class PostCard extends StatefulWidget {
 
 class _PostCardState extends State<PostCard> {
   int _myRating = 0;
+  bool _isEventJoined = false;
+  int _eventCount = 0;
 
   @override
   void initState() {
@@ -38,7 +42,26 @@ class _PostCardState extends State<PostCard> {
 
   void _syncFromPost() {
     _myRating = widget.post.myRating ?? 0;
+    _isEventJoined = widget.post.isEventJoined;
+    _eventCount = widget.post.eventParticipantCount;
   }
+
+  Future<void> _toggleEventJoin() async {
+    final api = SupabaseDataService();
+    final nextState = !_isEventJoined;
+    setState(() {
+      _isEventJoined = nextState;
+      _eventCount += nextState ? 1 : -1;
+    });
+    try {
+      if (nextState) {
+        await api.joinEvent(widget.post.id);
+      } else {
+        await api.leaveEvent(widget.post.id);
+      }
+    } catch (_) {}
+  }
+
 
   static String _formatDate(String iso) {
     if (iso.isEmpty) return '';
@@ -249,9 +272,83 @@ class _PostCardState extends State<PostCard> {
                   const SizedBox(height: 16),
                 ],
 
+                if (widget.post.isEvent) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _isEventJoined
+                          ? theme.secondary.withValues(alpha: 0.15)
+                          : theme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _isEventJoined
+                            ? theme.secondary
+                            : theme.primary.withValues(alpha: 0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isEventJoined ? Icons.event_available : Icons.event,
+                          color: _isEventJoined ? theme.secondary : theme.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _isEventJoined ? 'Etkinliğe Katılıyorsun 🎉' : 'Topluluk Etkinliği',
+                                style: TextStyle(
+                                  color: theme.textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (_eventCount > 0)
+                                Text(
+                                  '$_eventCount öğrenci katılıyor',
+                                  style: TextStyle(color: theme.textMuted, fontSize: 11),
+                                ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: _toggleEventJoin,
+                          icon: Icon(
+                            _isEventJoined ? Icons.check_circle : Icons.add_task,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                          label: Text(
+                            _isEventJoined ? 'Katıldın' : 'Etkinliğe Katıl',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isEventJoined ? theme.secondary : theme.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // Divider
                 Divider(color: theme.textMuted.withValues(alpha: 0.2)),
                 const SizedBox(height: 8),
+
 
                 // Etkileşimler
                 Row(
@@ -367,6 +464,14 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
+  Widget _buildLogoImage(String path, dynamic theme) {
+    return AppNetworkImage(
+      path: path,
+      fit: BoxFit.cover,
+      fallback: () => Icon(Icons.groups, color: theme.primary, size: 20),
+    );
+  }
+
   Widget _buildEventImage(String path) {
     const errorWidget = ColoredBox(
       color: Color(0x0DFFFFFF),
@@ -381,144 +486,48 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  Widget _buildLogoImage(String logoPath, AppTheme theme) {
-    if (logoPath.isEmpty) {
-      return Container(
-        color: theme.surface,
-        child: Icon(Icons.group, color: theme.textMuted, size: 22),
-      );
-    }
-    return AppNetworkImage(
-      path: logoPath,
-      fit: BoxFit.cover,
-      cacheWidth: 80,
-      placeholder: () => Container(color: theme.surface),
-      fallback: () => Icon(Icons.group, color: theme.textMuted, size: 22),
-    );
-  }
 
-  void _showRatingSheet(BuildContext context, AppTheme theme) {
-    int tempRating = _myRating;
-
+  void _showRatingSheet(BuildContext context, dynamic theme) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: theme.background,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(24),
-                    topRight: Radius.circular(24),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: theme.primary, width: 2),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${widget.post.toplulukAdi} Gönderisini Oyla',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (widget.post.ratingCount > 0) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Ortalama: ${widget.post.ratingAvg.toStringAsFixed(1)} '
-                        '(${widget.post.ratingCount} oy)',
-                        style: TextStyle(color: theme.textMuted, fontSize: 13),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(5, (i) {
-                        final star = i + 1;
-                        return GestureDetector(
-                          onTap: () =>
-                              setModalState(() => tempRating = star),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            margin: const EdgeInsets.symmetric(horizontal: 6),
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: star <= tempRating
-                                  ? theme.warning.withValues(alpha: 0.15)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              star <= tempRating
-                                  ? Icons.star_rounded
-                                  : Icons.star_border_rounded,
-                              color: star <= tempRating
-                                  ? theme.warning
-                                  : theme.textMuted,
-                              size: 40,
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    if (tempRating > 0) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        '$tempRating/5',
-                        style: TextStyle(
-                          color: theme.primary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: tempRating == 0
-                          ? null
-                          : () {
-                              setState(() {
-                                _myRating = tempRating;
-                              });
-                              widget.onRatingChanged(widget.post, tempRating);
-                              Navigator.pop(context);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primary,
-                        foregroundColor: theme.background,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Text(
-                        _myRating > 0
-                            ? 'Puanı Güncelle'
-                            : 'Puan Ver & XP Kazan',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Gönderiyi Puanla',
+                style: TextStyle(
+                  color: theme.textColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final starIndex = index + 1;
+                  return IconButton(
+                    icon: Icon(
+                      starIndex <= _myRating
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      color: theme.warning,
+                      size: 36,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _myRating = starIndex;
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
+              ),
+            ],
+          ),
         );
       },
     );

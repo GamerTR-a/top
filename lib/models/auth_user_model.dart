@@ -6,7 +6,7 @@ class AuthUser {
   final String name;
   final String email;
   final String? birthDate;
-  final String? department;
+  final String? department; // Comma-separated list of departments
   final bool isAdmin;
   final bool isBaskan;
   final String role;
@@ -24,11 +24,24 @@ class AuthUser {
     required this.createdAt,
   });
 
+  /// Returns department as a list (splits comma-separated string)
+  List<String> get departments {
+    if (department == null || department!.isEmpty) return [];
+    return department!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  /// Returns the first department for display purposes
+  String? get primaryDepartment {
+    final depts = departments;
+    return depts.isNotEmpty ? depts.first : null;
+  }
+
   factory AuthUser.fromProfileJson(
     User supabaseUser,
     Map<String, dynamic> profile,
   ) {
     final role = profile['role'] as String? ?? 'student';
+    final rawDept = profile['department'] as String?;
     return AuthUser(
       id: supabaseUser.id,
       name:
@@ -37,8 +50,7 @@ class AuthUser {
           '',
       email: supabaseUser.email ?? '',
       birthDate: profile['birth_date'] as String? ?? '01.01.2002',
-      department:
-          profile['department'] as String? ?? 'Bilişim Sistemleri Mühendisliği',
+      department: rawDept,
       isAdmin: role == 'admin',
       isBaskan: role == 'baskan',
       role: role,

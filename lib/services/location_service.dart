@@ -142,6 +142,16 @@ class LocationService {
     return 2 * earthRadiusKm * math.asin(math.sqrt(a));
   }
 
+  /// İki koordinat arası haversine mesafesi (metre).
+  static double distanceMeters(
+    double lat1,
+    double lng1,
+    double lat2,
+    double lng2,
+  ) =>
+      haversineKm(lat1, lng1, lat2, lng2) * 1000.0;
+
+
   /// Kabe'ye great-circle initial bearing (derece, 0–360).
   ///
   /// Kampüsten Kabe'ye ~154.5° (Türkiye kıblesi ~155° ile uyumlu).

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_text_field.dart';
+import '../constants/departments.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -14,22 +15,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _birthDateCtrl = TextEditingController();
-  final _departmentCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _passConfirmCtrl = TextEditingController();
+  final _deptSearchCtrl = TextEditingController();
+  String? _selectedDepartment;
   bool _passVisible = false;
   bool _passConfirmVisible = false;
   bool _loading = false;
   String? _errorMsg;
+  bool _showDepartmentDropdown = true;
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _birthDateCtrl.dispose();
-    _departmentCtrl.dispose();
     _passCtrl.dispose();
     _passConfirmCtrl.dispose();
+    _deptSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -38,6 +41,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$',
     );
     return emailRegex.hasMatch(email);
+  }
+
+  static bool _isValidEduEmail(String email) {
+    final normalizedEmail = email.toLowerCase().trim();
+    return normalizedEmail.endsWith('.edu') || normalizedEmail.endsWith('.edu.tr');
   }
 
   Future<void> _selectBirthDate() async {
@@ -71,12 +79,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _errorMsg = 'Geçerli bir e-posta adresi girin.');
       return;
     }
+    if (!_isValidEduEmail(email)) {
+      setState(() => _errorMsg = 'Kayıt için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.');
+      return;
+    }
     if (_birthDateCtrl.text.trim().isEmpty) {
       setState(() => _errorMsg = 'Lütfen doğum tarihinizi girin.');
       return;
     }
-    if (_departmentCtrl.text.trim().isEmpty) {
-      setState(() => _errorMsg = 'Lütfen bölüm bilginizi girin.');
+    if (_selectedDepartment == null || _selectedDepartment!.trim().isEmpty) {
+      setState(() => _errorMsg = 'Lütfen bir bölüm seçin.');
       return;
     }
     if (_passCtrl.text.length < 8) {
@@ -105,7 +117,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailCtrl.text.trim(),
         password: _passCtrl.text,
         birthDate: _birthDateCtrl.text.trim(),
-        department: _departmentCtrl.text.trim(),
+        department: _selectedDepartment!,
       );
       if (mounted) Navigator.pop(context, user);
     } catch (e) {
@@ -178,9 +190,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
+        title: Text(
           'Kayıt Ol',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
         ),
       ),
       body: SafeArea(
@@ -227,11 +239,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Center(
+              Center(
                 child: Text(
                   'Hesap Oluştur',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: theme.textColor,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
@@ -255,7 +267,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               _buildLabel('E-posta', theme),
               _buildField(
                 controller: _emailCtrl,
-                hint: 'ornek@subu.edu.tr',
+                hint: 'ornek@subu.edu.tr / ornek@uni.edu',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
                 theme: theme,
@@ -278,13 +290,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildLabel('Bölüm', theme),
-              _buildField(
-                controller: _departmentCtrl,
-                hint: 'Örn: Bilişim Sistemleri Mühendisliği',
-                icon: Icons.school_outlined,
-                theme: theme,
-              ),
+              _buildLabel('Bölümünüz', theme),
+              _buildDepartmentSelector(theme),
               const SizedBox(height: 16),
               _buildLabel('Şifre', theme),
               _buildField(
@@ -449,4 +456,200 @@ class _RegisterScreenState extends State<RegisterScreen> {
       suffix: suffix,
     );
   }
+
+  Widget _buildDepartmentSelector(AppTheme theme) {
+    final filterQuery = _deptSearchCtrl.text.trim().toLowerCase();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Seçim Alanı Başlığı / Seçilen Bölüm
+        InkWell(
+          onTap: () => setState(() => _showDepartmentDropdown = !_showDepartmentDropdown),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: theme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _selectedDepartment != null
+                    ? theme.primary
+                    : theme.primary.withValues(alpha: 0.2),
+                width: _selectedDepartment != null ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _selectedDepartment != null
+                      ? Icons.radio_button_checked
+                      : Icons.school_outlined,
+                  color: theme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedDepartment ?? 'Bölümünüzü seçin (Radio listesi)',
+                    style: TextStyle(
+                      color: _selectedDepartment != null ? theme.textColor : theme.textMuted,
+                      fontSize: 14,
+                      fontWeight: _selectedDepartment != null ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _showDepartmentDropdown ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(Icons.keyboard_arrow_down, color: theme.textMuted, size: 24),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Radio Button Listesi Container
+        if (_showDepartmentDropdown) ...[
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 320),
+            decoration: BoxDecoration(
+              color: theme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.primary.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              children: [
+                // Bölüm Arama Kutusu
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                  child: TextField(
+                    controller: _deptSearchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    style: TextStyle(color: theme.textColor, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Bölüm ara...',
+                      hintStyle: TextStyle(color: theme.textMuted, fontSize: 13),
+                      prefixIcon: Icon(Icons.search, color: theme.primary, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      filled: true,
+                      fillColor: theme.background.withValues(alpha: 0.5),
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.primary),
+                      ),
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                // Radio Butonları Listesi
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: kDepartmentsByCategory.entries.map((entry) {
+                        final filteredDepts = entry.value.where((dept) {
+                          if (filterQuery.isEmpty) return true;
+                          return dept.toLowerCase().contains(filterQuery);
+                        }).toList();
+
+                        if (filteredDepts.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                              color: theme.primary.withValues(alpha: 0.05),
+                              child: Text(
+                                entry.key.toUpperCase(),
+                                style: TextStyle(
+                                  color: theme.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ),
+                            ...filteredDepts.map((dept) {
+                              final isSelected = _selectedDepartment == dept;
+                              return InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedDepartment = dept;
+                                    _showDepartmentDropdown = false;
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? theme.primary.withValues(alpha: 0.12)
+                                        : Colors.transparent,
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: theme.primary.withValues(alpha: 0.04),
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSelected
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_unchecked,
+                                        color: isSelected
+                                            ? theme.primary
+                                            : theme.textMuted,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          dept,
+                                          style: TextStyle(
+                                            color: isSelected
+                                                ? theme.primary
+                                                : theme.textColor,
+                                            fontSize: 13,
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
+
+
+
+

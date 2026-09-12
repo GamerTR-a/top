@@ -1,0 +1,24 @@
+workflows:
+  ios-release:
+    name: NevGenç iOS App Store Release
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        APP_STORE_CONNECT_ISSUER_ID: "e605816f-4dbc-41f6-a0cb-61d131147671"
+        APP_STORE_CONNECT_KEY_IDENTIFIER: "8NRWS5B4GM"
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Build iOS IPA
+        script: |
+          flutter build ipa --release --build-name=1.0.25 --build-number=26
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration

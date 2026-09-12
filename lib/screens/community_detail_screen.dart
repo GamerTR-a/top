@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import '../models/topluluk.dart';
+import '../models/auth_user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
 import '../services/joined_communities_service.dart';
 import '../services/supabase_data_service.dart';
 import 'community_chat_screen.dart';
+import 'community_management_screen.dart';
 
 class CommunityDetailScreen extends StatefulWidget {
   final Topluluk topluluk;
-  const CommunityDetailScreen({super.key, required this.topluluk});
+  final AuthUser? currentUser;
+  const CommunityDetailScreen({super.key, required this.topluluk, this.currentUser});
 
   @override
   State<CommunityDetailScreen> createState() => _CommunityDetailScreenState();
@@ -96,6 +99,24 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                 ),
               ),
               actions: [
+                // Management button for president
+                if (widget.currentUser != null &&
+                    widget.currentUser!.isBaskan &&
+                    widget.currentUser!.id == widget.topluluk.baskanId)
+                  IconButton(
+                    icon: Icon(Icons.admin_panel_settings_rounded, color: theme.primary, size: 24),
+                    tooltip: 'Topluluk Yönetimi',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CommunityManagementScreen(
+                            topluluk: widget.topluluk,
+                            currentUser: widget.currentUser!,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 if (_isMember != null)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),

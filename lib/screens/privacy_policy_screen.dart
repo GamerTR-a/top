@@ -70,7 +70,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: _accepted ? Colors.green.withOpacity(0.1) : theme.primaryColor.withOpacity(0.1),
+                            color: _accepted ? Colors.green.withValues(alpha: 0.1) : theme.primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Icon(
@@ -155,7 +155,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                 color: theme.cardColor,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 10,
                     offset: const Offset(0, -4),
                   ),
@@ -206,7 +206,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: theme.dividerColor.withOpacity(0.1),
+          color: theme.dividerColor.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -232,7 +232,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
             content,
             style: TextStyle(
               fontSize: 12.5,
-              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
+              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
               height: 1.5,
             ),
           ),

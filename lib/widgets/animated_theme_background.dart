@@ -587,35 +587,6 @@ class _NodeData {
   });
 }
 
-class _RockData {
-  final double xRatio, yRatio, vx, vy, radius, rotationSpeed, initialAngle;
-  final int sides;
-  final bool isBehind, isWarm;
-  const _RockData({
-    required this.xRatio,
-    required this.yRatio,
-    required this.vx,
-    required this.vy,
-    required this.radius,
-    required this.rotationSpeed,
-    required this.initialAngle,
-    required this.sides,
-    required this.isBehind,
-    required this.isWarm,
-  });
-}
-
-class _DustData {
-  final double xRatio, yRatio, radius, vx, vy, alpha;
-  const _DustData({
-    required this.xRatio,
-    required this.yRatio,
-    required this.radius,
-    required this.vx,
-    required this.vy,
-    required this.alpha,
-  });
-}
 
 class _BubbleData {
   final double x, radius, speed, phase;

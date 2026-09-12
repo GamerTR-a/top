@@ -7,13 +7,49 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name          TEXT NOT NULL,
-  role          TEXT NOT NULL DEFAULT 'student', -- 'student' | 'admin'
-  department    TEXT,
+  role          TEXT NOT NULL DEFAULT 'student', -- 'student' | 'admin' | 'baskan'
+  department    TEXT[], -- Array of departments (multi-select)
   grade         TEXT,
   xp            INTEGER NOT NULL DEFAULT 0,
   profile_photo TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Migration: department TEXT -> TEXT[] (run if upgrading from old schema)
+-- ALTER TABLE public.profiles
+--   ALTER COLUMN department TYPE TEXT[] USING CASE
+--     WHEN department IS NULL OR department = '' THEN '{}'::TEXT[]
+--     ELSE ARRAY[department]
+--   END;
+
+-- E-posta domain kısıtı: Sadece .edu veya .edu.tr uzantılı e-postalar
+-- Bu, Supabase Auth'e kaydolma sırasında kontrol edilemez, ancak
+-- backend ve frontend zaten doğruluyor; bu ek bir koruma katmanıdır.
+-- NOT: auth.users tablosuna CHECK kısıtı eklenemez (Supabase yönetiyor).
+-- Bu yüzden profiles tablosunda bir trigger ile kontrol yapabiliriz.
+
+-- Trigger fonksiyon: Profil oluşturulurken e-posta domain'i doğrula
+CREATE OR REPLACE FUNCTION public.validate_student_email_domain()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- auth.users'dan e-postayı al ve domain'i kontrol et
+  IF NEW.id IS NOT NULL THEN
+    PERFORM email FROM auth.users WHERE id = NEW.id AND (
+      email ILIKE '%.edu' OR email ILIKE '%.edu.tr'
+    );
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Geçersiz e-posta domaini. Sadece .edu veya .edu.tr uzantılı öğrenci e-postaları kabul edilir.';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- Trigger: Profil insert/update öncesi e-posta domain kontrolü
+DROP TRIGGER IF EXISTS profiles_validate_email_domain ON public.profiles;
+CREATE TRIGGER profiles_validate_email_domain
+  BEFORE INSERT OR UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.validate_student_email_domain();
 
 -- Yeni kullanıcı kaydında otomatik profil oluşturmaz; uygulama tarafından oluşturulur.
 
@@ -148,6 +184,33 @@ CREATE TABLE IF NOT EXISTS public.community_messages (
   type         TEXT NOT NULL DEFAULT 'general',
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ── 14. Kullanıcı Talepleri ve Şikayetleri ──────────────────────
+CREATE TABLE IF NOT EXISTS public.user_tickets (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type        TEXT NOT NULL CHECK (type IN ('complaint', 'request', 'suggestion')), -- şikayet, talep, öneri
+  subject     TEXT NOT NULL,
+  description TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+  admin_notes TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_tickets_user ON public.user_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_tickets_status ON public.user_tickets(status);
+
+ALTER TABLE public.user_tickets ENABLE ROW LEVEL SECURITY;
+
+-- Kullanıcı: kendi ticket'larını okuyabilir, oluşturabilir
+CREATE POLICY "tickets_select_own" ON public.user_tickets FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "tickets_insert_own" ON public.user_tickets FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Admin: hepsini okuyabilir, güncelleyebilir (status, admin_notes)
+CREATE POLICY "tickets_admin_all" ON public.user_tickets FOR ALL
+  USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'admin'));
 
 -- ── İndeksler ────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_posts_community      ON public.posts(community_id);
@@ -340,3 +403,24 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.community_messages;
 INSERT INTO public.badges (name, icon, description) VALUES
   ('İlk Adım', '🎯', 'İlk kayıt rozeti')
 ON CONFLICT DO NOTHING;
+
+-- ── RPC: Hesap silme (Apple App Store 5.1.1(v) uyumlu) ────────
+CREATE OR REPLACE FUNCTION public.delete_account()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_user_id UUID := auth.uid();
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  -- Profil silinince CASCADE ile tüm ilişkili veriler silinir (FK ON DELETE CASCADE)
+  DELETE FROM public.profiles WHERE id = v_user_id;
+
+  -- Auth kullanıcısını da sil (admin API gerekli, SECURITY DEFINER ile çalışır)
+  PERFORM auth.admin.delete_user(v_user_id);
+END;
+$$;
+
+-- İndeks: hesap silme performansı için (opsiyonel)
+CREATE INDEX IF NOT EXISTS idx_profiles_id ON public.profiles(id);

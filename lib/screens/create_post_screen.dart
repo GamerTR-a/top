@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/auth_user_model.dart';
 import '../models/topluluk.dart';
 import '../services/supabase_data_service.dart';
+import '../utils/file_validator.dart';
 
 import '../theme/app_theme.dart';
 
@@ -31,6 +32,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   String? _errorMsg;
 
   bool get _isAdmin => widget.user?.isAdmin == true;
+
+  bool _isEvent = false;
 
   @override
   void initState() {
@@ -71,8 +74,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         imageQuality: 85,
       );
       if (picked == null) return;
+
+      final validation = await FileValidator.validateXFile(picked);
+      if (!validation.isValid) {
+        if (!mounted) return;
+        setState(() => _errorMsg = validation.errorMessage);
+        return;
+      }
+
       setState(() {
         _pickedImage = picked;
+        _errorMsg = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -131,6 +143,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         communityId: _selectedTopluluk!.id,
         content: content,
         imageUrl: imageUrl,
+        isEvent: _isEvent,
       );
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -145,6 +158,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppTheme>(
@@ -155,10 +169,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           appBar: AppBar(
             backgroundColor: theme.surface,
             elevation: 0,
-            title: const Text(
+            title: Text(
               'Yeni Gönderi',
               style: TextStyle(
-                color: Colors.white,
+                color: theme.textColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -292,8 +306,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                                 ),
                               )
                             : null,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: theme.textColor,
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
@@ -418,8 +432,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _imageUrlCtrl,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: theme.textColor,
                           fontSize: 14,
                         ),
                         keyboardType: TextInputType.url,
@@ -458,6 +472,48 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+
+                      // Etkinlik Katılım Butonu Ekleme Switch Card
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: theme.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _isEvent
+                                ? theme.primary
+                                : theme.primary.withValues(alpha: 0.2),
+                            width: _isEvent ? 1.5 : 1,
+                          ),
+                        ),
+                        child: SwitchListTile(
+                          value: _isEvent,
+                          onChanged: (val) => setState(() => _isEvent = val),
+                          activeThumbColor: theme.primary,
+                          contentPadding: EdgeInsets.zero,
+                          title: Row(
+                            children: [
+                              Icon(Icons.event_available, color: theme.primary, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Etkinlik Katılım Butonu Ekle',
+                                style: TextStyle(
+                                  color: theme.textColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            'Öğrencilerin bu gönderi üzerinden etkinliğinize katılmasına izin verin',
+                            style: TextStyle(color: theme.textMuted, fontSize: 11),
+                          ),
+                        ),
+                      ),
+
 
                       if (_errorMsg != null) ...[
                         const SizedBox(height: 16),

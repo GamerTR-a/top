@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,9 +14,11 @@ import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/options_sheet.dart';
+import '../utils/file_validator.dart';
 import '../theme/app_theme.dart';
 import 'community_detail_screen.dart';
 import 'leaderboard_screen.dart';
+import 'memory_gallery_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AuthUser user;
@@ -272,6 +273,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (picked == null) return;
 
+      final validation = await FileValidator.validateXFile(picked);
+      if (!validation.isValid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(validation.errorMessage!),
+              backgroundColor: themeNotifier.value.error,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          );
+        }
+        return;
+      }
+
       // Uygulama belge dizinine kopyala
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = 'profile_${widget.user.id}.jpg';
@@ -456,7 +472,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => CommunityDetailScreen(topluluk: t),
+          builder: (_) => CommunityDetailScreen(topluluk: t, currentUser: widget.user),
         ),
       ),
       child: Container(
@@ -1192,7 +1208,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MemoryGalleryScreen()),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.surface.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.primary.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.photo_library_outlined,
+                              size: 28,
+                              color: theme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Albümlerimi Görüntüle',
+                                    style: TextStyle(
+                                      color: theme.textColor,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Yerel depolamada güvenle saklanan anılarınız',
+                                    style: TextStyle(
+                                      color: theme.textMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: theme.textMuted,
+                              size: 24,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Katıldığım Topluluklar — yerel depolamadan, anında güncellenir
                     Align(
@@ -1366,130 +1438,3 @@ class BadgeParcelItem {
   });
 }
 
-class _DecagonParcelWheelPainter extends CustomPainter {
-  final List<BadgeParcelItem> parcels;
-  final int selectedIndex;
-  final bool isDark;
-
-  _DecagonParcelWheelPainter({
-    required this.parcels,
-    required this.selectedIndex,
-    required this.isDark,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final outerRadius = math.min(size.width, size.height) * 0.44;
-    final innerRadius = outerRadius * 0.38;
-
-    final count = parcels.length;
-    final anglePerSector = (2 * math.pi) / count;
-
-    // Draw central "O" node
-    final centerDotPaint = Paint()
-      ..color = const Color(0xFFD32F2F)
-      ..style = PaintingStyle.fill;
-
-    final linePaint = Paint()
-      ..color = (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8))
-          .withValues(alpha: 0.5)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-
-    // Draw sectors (10 trapezoid parcels around center)
-    for (int i = 0; i < count; i++) {
-      final parcel = parcels[i];
-      // Angle offset so index 0 is at top (-pi/2)
-      final startAngle =
-          -math.pi / 2 + (i * anglePerSector) - (anglePerSector / 2);
-      final endAngle = startAngle + anglePerSector;
-
-      // Small gap between parcels
-      const gapAngle = 0.04;
-      final actualStart = startAngle + gapAngle;
-      final actualEnd = endAngle - gapAngle;
-
-      final path = Path();
-      // Outer arc corner 1
-      final p1 = Offset(
-        center.dx + outerRadius * math.cos(actualStart),
-        center.dy + outerRadius * math.sin(actualStart),
-      );
-      // Outer arc corner 2
-      final p2 = Offset(
-        center.dx + outerRadius * math.cos(actualEnd),
-        center.dy + outerRadius * math.sin(actualEnd),
-      );
-      // Inner arc corner 2
-      final p3 = Offset(
-        center.dx + innerRadius * math.cos(actualEnd),
-        center.dy + innerRadius * math.sin(actualEnd),
-      );
-      // Inner arc corner 1
-      final p4 = Offset(
-        center.dx + innerRadius * math.cos(actualStart),
-        center.dy + innerRadius * math.sin(actualStart),
-      );
-
-      path.moveTo(p1.dx, p1.dy);
-      path.lineTo(p2.dx, p2.dy);
-      path.lineTo(p3.dx, p3.dy);
-      path.lineTo(p4.dx, p4.dy);
-      path.close();
-
-      final isSelected = i == selectedIndex;
-
-      final fillPaint = Paint()
-        ..color = parcel.color.withValues(alpha: isSelected ? 0.95 : 0.65)
-        ..style = PaintingStyle.fill;
-
-      final borderPaint = Paint()
-        ..color = isSelected ? Colors.white : parcel.color
-        ..strokeWidth = isSelected ? 2.5 : 1.5
-        ..style = PaintingStyle.stroke;
-
-      canvas.drawPath(path, fillPaint);
-      canvas.drawPath(path, borderPaint);
-
-      // Draw radial line from inner vertex to center O
-      canvas.drawLine(center, p4, linePaint);
-    }
-
-    // Draw central red "O" node circle
-    canvas.drawCircle(center, 7, centerDotPaint);
-    canvas.drawCircle(
-      center,
-      7,
-      Paint()
-        ..color = Colors.white
-        ..strokeWidth = 2.0
-        ..style = PaintingStyle.stroke,
-    );
-
-    // Draw "O" label
-    final textSpan = TextSpan(
-      text: 'O',
-      style: TextStyle(
-        color: isDark ? Colors.white : Colors.black87,
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
-    textPainter.paint(
-      canvas,
-      Offset(center.dx - textPainter.width / 2, center.dy - 22),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _DecagonParcelWheelPainter oldDelegate) {
-    return oldDelegate.selectedIndex != selectedIndex ||
-        oldDelegate.isDark != isDark;
-  }
-}

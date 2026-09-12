@@ -1,30 +1,39 @@
 import 'dart:async' show StreamSubscription, unawaited;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import 'screens/community_maze_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/leaderboard_screen.dart';
 import 'screens/nev_plus_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
 import 'models/auth_user_model.dart';
 import 'services/supabase_auth_service.dart';
-import 'services/notification_service.dart';
 import 'services/fcm_service.dart';
 import 'services/socket_service.dart';
 import 'config/app_config.dart';
 
 import 'services/local_storage_service.dart';
-import 'services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 SupabaseClient get supabase => Supabase.instance.client;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Android 15 Edge-to-Edge desteği (Deprecated Window renk parametreleri kaldırıldı)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
 
   try {
     await LocalStorageService.getInstance();
@@ -123,9 +132,6 @@ class _AuthGateState extends State<AuthGate> {
     try {
       user = await SupabaseAuthService.getCurrentUser();
     } catch (_) {}
-    try {
-      user ??= await AuthService.getCurrentUser();
-    } catch (_) {}
 
     if (mounted) {
       setState(() {
@@ -201,7 +207,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   Widget _buildPage(int index) => switch (index) {
     0 => HomeScreen(currentUser: widget.user),
-    1 => const CommunityMazeScreen(),
+    1 => CommunityMazeScreen(currentUser: widget.user),
     2 => NevPlusScreen(user: widget.user),
     3 => const CalendarScreen(),
     4 => ProfileScreen(user: widget.user, onLogout: widget.onLogout),
@@ -215,7 +221,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   void initState() {
     super.initState();
     // Yalnızca ana ekranı (index 0 - en baştaki Anasayfa) başlangıçta yükle
-    _pageCache = {0: HomeScreen(currentUser: widget.user)};
+    _pageCache = {0: HomeScreen(currentUser: widget.user), 1: CommunityMazeScreen(currentUser: widget.user)};
   }
 
   void _onTabTapped(int index) {
@@ -313,22 +319,18 @@ class _MainScaffoldState extends State<MainScaffold> {
     required IconData icon,
     required String label,
     required AppTheme theme,
-    bool customIcon = false,
-    Widget? customWidget,
   }) {
     final isSelected = _currentIndex == index;
     final color = isSelected ? theme.primary : theme.textMuted;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmall = screenWidth < 380;
     final isTablet = screenWidth >= 600;
-    final iconSize = isSmall ? 20.0 : (isTablet ? 28.0 : 24.0);
+    final baseIconSize = isSmall ? 20.0 : (isTablet ? 28.0 : 24.0);
     final labelFontSize = isSmall ? 8.0 : (isTablet ? 12.0 : 10.0);
     final hPad = isSmall ? 2.0 : (isTablet ? 12.0 : 4.0);
     final isNevPlus = index == 2;
 
-    // Seçili ikon %15 daha büyük, seçilmemiş daha küçük
-    final selectedIconSize = iconSize * 1.15;
-    final unselectedIconSize = iconSize * 0.92;
+    final effectiveIconSize = isSelected ? (baseIconSize * 1.15) : (baseIconSize * 0.92);
 
     return GestureDetector(
       onTap: () => _onTabTapped(index),
@@ -346,8 +348,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutBack,
                 child: Container(
-                  width: iconSize * 1.6,
-                  height: iconSize * 1.6,
+                  width: baseIconSize * 1.6,
+                  height: baseIconSize * 1.6,
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -362,13 +364,13 @@ class _MainScaffoldState extends State<MainScaffold> {
                   child: ClipOval(
                     child: Image.asset(
                       'assets/nev_plus_logo.png',
-                      width: iconSize * 1.2,
-                      height: iconSize * 1.2,
+                      width: baseIconSize * 1.2,
+                      height: baseIconSize * 1.2,
                       fit: BoxFit.contain,
                       errorBuilder: (ctx, err, stack) => Icon(
                         Icons.add_rounded,
                         color: isSelected ? const Color(0xFFFFD700) : theme.textMuted,
-                        size: iconSize * 1.2,
+                        size: baseIconSize * 1.2,
                       ),
                     ),
                   ),
@@ -380,10 +382,10 @@ class _MainScaffoldState extends State<MainScaffold> {
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeOutBack,
                 child: SizedBox(
-                  width: iconSize * 1.6,
-                  height: iconSize * 1.6,
+                  width: baseIconSize * 1.6,
+                  height: baseIconSize * 1.6,
                   child: Center(
-                    child: Icon(icon, color: color, size: iconSize),
+                    child: Icon(icon, color: color, size: effectiveIconSize),
                   ),
                 ),
               ),

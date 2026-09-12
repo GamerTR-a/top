@@ -1,0 +1,48 @@
+name: iOS App Store Build & Upload
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: Build & Upload iOS App
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Install App Store Connect API Key
+        env:
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          if [ -n "$PRIVATE_KEY" ]; then
+            echo "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID:-8NRWS5B4GM}.p8
+          elif [ -f "AuthKey_8NRWS5B4GM.p8" ]; then
+            cp AuthKey_8NRWS5B4GM.p8 ~/.appstoreconnect/private_keys/AuthKey_8NRWS5B4GM.p8
+          fi
+
+      - name: Build iOS IPA & Archive
+        run: |
+          flutter build ipa --release \
+            --build-name=1.0.25 \
+            --build-number=26
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NevGenc-iOS-v1.0.25
+          path: build/ios/ipa/*.ipa

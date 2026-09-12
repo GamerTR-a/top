@@ -8,6 +8,34 @@ const { dbRun, dbGet } = require('../config/database');
 const { requireAuth } = require('../middleware/auth');
 const { handleValidation } = require('../middleware/errorHandler');
 
+// Rate limiters are created in index.js and passed via app locals
+// We'll create simple inline limiters here for specific endpoints
+const rateLimit = require('express-rate-limit');
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla şifre sıfırlama isteği. 1 saat bekleyin.' } },
+});
+
+const resetPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla şifre sıfırlama denemesi. 1 saat bekleyin.' } },
+});
+
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla token yenileme denemesi. 15 dakika bekleyin.' } },
+});
+
 async function makeTokens(userId) {
   const accessToken = jwt.sign({ sub: userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_ACCESS_EXPIRES || '1h',
@@ -36,6 +64,18 @@ router.post('/register',
   async (req, res, next) => {
     try {
       const { name, email, password, department, grade } = req.body;
+
+      // Öğrenci e-posta doğrulaması: .edu veya .edu.tr ile bitmeli
+      const normalizedEmail = email.toLowerCase();
+      if (!normalizedEmail.endsWith('.edu') && !normalizedEmail.endsWith('.edu.tr')) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'INVALID_EMAIL_DOMAIN',
+            message: 'Kayıt için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.',
+          },
+        });
+      }
       const adminEmail = (process.env.ADMIN_EMAIL || 'admin@newgenc.com').toLowerCase();
       if (email.toLowerCase() === adminEmail) {
         return res.status(409).json({ success: false, error: { code: 'EMAIL_RESERVED', message: 'Bu e-posta kullanılamaz.' } });
@@ -70,7 +110,15 @@ router.post('/login',
   async (req, res, next) => {
     try {
       const { email, password } = req.body;
-      const user = await dbGet('SELECT * FROM users WHERE email = ?', [email.toLowerCase()]);
+      const normalizedEmail = email.toLowerCase();
+      // Öğrenci e-posta doğrulaması: .edu veya .edu.tr ile bitmeli
+      if (!normalizedEmail.endsWith('.edu') && !normalizedEmail.endsWith('.edu.tr')) {
+        return res.status(401).json({
+          success: false,
+          error: { code: 'INVALID_EMAIL_DOMAIN', message: 'Giriş için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.' },
+        });
+      }
+      const user = await dbGet('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
       if (!user || !bcrypt.compareSync(password, user.password_hash)) {
         return res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'E-posta veya şifre hatalı.' } });
       }
@@ -83,6 +131,7 @@ router.post('/login',
 
 // POST /v1/auth/refresh
 router.post('/refresh',
+  refreshLimiter,
   body('refreshToken').notEmpty().withMessage('Refresh token gerekli.'),
   handleValidation,
   async (req, res, next) => {
@@ -122,12 +171,21 @@ router.get('/me', requireAuth, async (req, res, next) => {
 
 // POST /v1/auth/forgot-password
 router.post('/forgot-password',
+  forgotPasswordLimiter,
   body('email').isEmail().normalizeEmail().withMessage('Geçerli e-posta girin.'),
   handleValidation,
   async (req, res, next) => {
     try {
       const { email } = req.body;
-      const user = await dbGet('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
+      const normalizedEmail = email.toLowerCase();
+      // Öğrenci e-posta doğrulaması: .edu veya .edu.tr ile bitmeli
+      if (!normalizedEmail.endsWith('.edu') && !normalizedEmail.endsWith('.edu.tr')) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_EMAIL_DOMAIN', message: 'Şifre sıfırlama için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.' },
+        });
+      }
+      const user = await dbGet('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
       if (user) {
         const rawToken = uuidv4();
         const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
@@ -137,9 +195,8 @@ router.post('/forgot-password',
           'INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at) VALUES (?, ?, ?, ?)',
           [uuidv4(), user.id, tokenHash, expiresAt]
         );
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`[DEV] Şifre sıfırlama token'ı: ${rawToken}`);
-        }
+        // GÜVENLİK: Reset token asla loglanmamalı - geliştirme bile olsa
+        // E-posta gönderimi implement edileceğinde token doğrudan e-postada yer alacak
       }
       res.json({ success: true, data: { message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.' } });
     } catch (err) { next(err); }
@@ -148,6 +205,7 @@ router.post('/forgot-password',
 
 // POST /v1/auth/reset-password
 router.post('/reset-password',
+  resetPasswordLimiter,
   body('token').notEmpty().withMessage('Token gerekli.'),
   body('newPassword')
     .isLength({ min: 8 }).withMessage('Şifre en az 8 karakter olmalı.')

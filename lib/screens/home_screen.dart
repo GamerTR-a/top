@@ -300,15 +300,15 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Gönderiyi Şikayet Et 🚩',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
         ),
         content: TextField(
           controller: reasonCtrl,
           maxLength: 300,
           maxLines: 3,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: TextStyle(color: theme.textColor, fontSize: 14),
           decoration: InputDecoration(
             hintText: 'Gerekçe (isteğe bağlı)',
             hintStyle: TextStyle(color: theme.textMuted, fontSize: 13),
@@ -697,10 +697,10 @@ class _UpcomingEventsSection extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(w * 0.04, 16, w * 0.04, 10),
-          child: const Text(
+          child: Text(
             'Yaklaşan Etkinlikler 📅',
             style: TextStyle(
-              color: Colors.white,
+              color: theme.textColor,
               fontSize: 18,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
@@ -805,8 +805,8 @@ class _EventCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: theme.textColor,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),

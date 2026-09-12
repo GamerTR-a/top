@@ -65,14 +65,6 @@ class SupabaseAuthService {
         msg.contains('violates')) {
       return 'Yetki hatası. Lütfen tekrar giriş yapın.';
     }
-    if (msg.contains('cancel') ||
-        msg.contains('cancelled') ||
-        msg.contains('canceled')) {
-      return 'Google ile giriş iptal edildi.';
-    }
-    if (msg.contains('provider is not enabled')) {
-      return 'Google ile giriş henüz sunucuda etkinleştirilmemiş. Lütfen yöneticiyle iletişime geçin.';
-    }
     if (msg.contains('invalid state') || msg.contains('invalid redirect')) {
       return 'Giriş bağlantısı geçersiz. Lütfen tekrar deneyin.';
     }
@@ -137,15 +129,20 @@ class SupabaseAuthService {
     required String userId,
     required String name,
     String? birthDate,
-    String? department,
+    String? department, // Comma-separated string
     String? grade,
   }) async {
+    // Convert comma-separated string to array for TEXT[] column
+    List<String>? deptArray;
+    if (department != null && department.isNotEmpty) {
+      deptArray = department.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
     await _client.from('profiles').upsert({
       'id': userId,
       'name': name,
       'role': 'student',
       if (birthDate != null && birthDate.isNotEmpty) 'birth_date': birthDate,
-      if (department != null && department.isNotEmpty) 'department': department,
+      if (deptArray != null && deptArray.isNotEmpty) 'department': deptArray,
       if (grade != null && grade.isNotEmpty) 'grade': grade,
     });
   }
@@ -177,10 +174,9 @@ class SupabaseAuthService {
   static Future<AuthUser> login({
     required String email,
     required String password,
-    bool isAdminLogin = false,
   }) async {
     try {
-      if (!isAdminLogin) _validateEduEmail(email);
+      _validateEduEmail(email);
       final res = await _client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -219,79 +215,6 @@ class SupabaseAuthService {
     } catch (e) {
       throw SupabaseAuthException(_mapError(e));
     }
-  }
-
-  /// Google ile şifresiz giriş. Supabase OAuth (PKCE) akışını kullanır:
-  /// tarayıcıda Google hesap seçici açılır, `supabase://login` derin linkiyle
-  /// uygulamaya geri dönülür. İlk girişte profil Google bilgileriyle otomatik
-  /// oluşturulur — hesap, `auth.uid()` ile tektir (aynı Google hesabı hep aynı
-  /// kullanıcıya bağlanır).
-  static Future<AuthUser> signInWithGoogle() async {
-    try {
-      await _client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'supabase://login',
-      );
-
-      final user = _client.auth.currentUser;
-      if (user == null) {
-        throw const SupabaseAuthException(
-          'Google ile giriş tamamlanamadı. Lütfen tekrar deneyin.',
-        );
-      }
-
-      // Google hesabı da aynı eğitim e-postası kısıtına tabi
-      // (Google girişi yalnızca alternatif bir yöntemdir).
-      final email = user.email ?? '';
-      try {
-        _validateEduEmail(email);
-      } on SupabaseAuthException {
-        // Geçersiz hesap: oturumu hemen kapat, uygulamaya giriş yapma.
-        await _client.auth.signOut();
-        throw const SupabaseAuthException(
-          'Bu Google hesabı kurumsal bir öğrenci e-postasıyla '
-          '(.edu veya .edu.tr) açılmadığı için giriş yapılamaz. '
-          'Lütfen okul e-postanızla açılmış bir Google hesabı kullanın '
-          'veya e-posta ile giriş yapın.',
-        );
-      }
-
-      // İlk girişte profil yoksa Google bilgileriyle oluştur
-      final profile = await _client
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .maybeSingle();
-
-      final AuthUser authUser;
-      if (profile == null) {
-        await _insertProfile(userId: user.id, name: _googleName(user));
-        await _grantFirstBadge(user.id);
-        final newProfile = await _client
-            .from('profiles')
-            .select()
-            .eq('id', user.id)
-            .single();
-        authUser = AuthUser.fromProfileJson(user, newProfile);
-      } else {
-        authUser = AuthUser.fromProfileJson(user, profile);
-      }
-      await _cacheAuthUser(authUser);
-      return authUser;
-    } on SupabaseAuthException {
-      rethrow;
-    } catch (e) {
-      throw SupabaseAuthException(_mapError(e));
-    }
-  }
-
-  /// Google hesabından gösterilebilir bir ad çıkarır.
-  static String _googleName(User user) {
-    final fullName = user.userMetadata?['full_name'];
-    if (fullName is String && fullName.trim().isNotEmpty) return fullName;
-    final email = user.email;
-    if (email != null && email.contains('@')) return email.split('@').first;
-    return 'Kullanıcı';
   }
 
   static Future<void> logout() async {
@@ -342,8 +265,11 @@ class SupabaseAuthService {
 
   static Future<void> resetPassword(String email) async {
     try {
+      // Öğrenci e-posta doğrulaması
+      _validateEduEmail(email);
       await _client.auth.resetPasswordForEmail(email);
     } catch (e) {
+      if (e is SupabaseAuthException) rethrow;
       throw SupabaseAuthException(_mapError(e));
     }
   }

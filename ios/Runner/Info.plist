@@ -32,6 +32,12 @@
 	<string>Konumunuzu kampüs haritası, Sakarya dışı kontrolü ve kıble pusulası için kullanıyoruz.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>Pusula yönünü hesaplamak için cihazın hareket sensörünü kullanıyoruz.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hatıra Galerisi ve profil fotoğrafı için fotoğraflarınızı seçebilmek için galeri erişimine ihtiyacımız var.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Fotoğrafları cihazınıza kaydedebilmek için galeriye erişim izni gereklidir.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Hatıra Galerisi için anılarınızı çekmek amacıyla kameraya erişime ihtiyacımız var.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

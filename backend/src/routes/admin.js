@@ -5,6 +5,16 @@ const { dbRun, dbGet, dbAll, dbTransaction } = require('../config/database');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { handleValidation } = require('../middleware/errorHandler');
 const { sendNotification } = require('./notifications');
+const rateLimit = require('express-rate-limit');
+
+// Admin broadcast için limiter (index.js'te de tanımlı, burada da kullanıyoruz)
+const adminBroadcastLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'RATE_LIMIT', message: 'Çok fazla broadcast gönderimi. 1 saat bekleyin.' } },
+});
 
 // GET /v1/admin/users
 router.get('/users', requireAuth, requireAdmin, async (req, res, next) => {
@@ -80,7 +90,7 @@ router.get('/stats', requireAuth, requireAdmin, async (req, res, next) => {
 
 // POST /v1/admin/broadcast
 router.post('/broadcast',
-  requireAuth, requireAdmin,
+  requireAuth, requireAdmin, adminBroadcastLimiter,
   body('title').trim().notEmpty().withMessage('Başlık gerekli.'),
   body('body').trim().notEmpty().withMessage('Mesaj gerekli.'),
   body('type').optional().isIn(['info', 'event', 'badge', 'system']),

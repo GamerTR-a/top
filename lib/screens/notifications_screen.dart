@@ -28,10 +28,10 @@ class NotificationsScreen extends StatelessWidget {
               icon: Icon(Icons.arrow_back_ios, color: theme.primary),
               onPressed: () => Navigator.pop(context),
             ),
-            title: const Text(
+            title: Text(
               'Bildirimler 🔔',
               style: TextStyle(
-                color: Colors.white,
+                color: theme.textColor,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -144,7 +144,7 @@ class NotificationsScreen extends StatelessWidget {
                                         child: Text(
                                           n.title,
                                           style: TextStyle(
-                                            color: Colors.white,
+                                            color: theme.textColor,
                                             fontWeight: n.isRead
                                                 ? FontWeight.normal
                                                 : FontWeight.bold,

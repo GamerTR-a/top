@@ -3,9 +3,11 @@ import '../models/auth_user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_theme_background.dart';
 import 'admin_screen.dart';
+import 'baskan_panel_screen.dart';
 import 'campus_map_screen.dart';
 import 'games/game_room_screen.dart';
 import 'sosyo_screen.dart';
+
 
 class NevPlusScreen extends StatelessWidget {
   final AuthUser? user;
@@ -83,6 +85,7 @@ class NevPlusScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAdmin = user?.isAdmin ?? false;
+    final isBaskan = user?.isBaskan ?? false;
 
     return ValueListenableBuilder<AppTheme>(
       valueListenable: themeNotifier,
@@ -214,6 +217,22 @@ class NevPlusScreen extends StatelessWidget {
                       );
                     },
                   ),
+                  if (isAdmin || isBaskan)
+                    _buildMenuItem(
+                      context,
+                      theme,
+                      'Başkan Paneli',
+                      Icons.workspace_premium_outlined,
+                      const Color(0xFF43A047),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const BaskanPanelScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   if (isAdmin)
                     _buildMenuItem(
                       context,
@@ -239,4 +258,5 @@ class NevPlusScreen extends StatelessWidget {
       },
     );
   }
+
 }

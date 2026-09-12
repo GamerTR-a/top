@@ -59,12 +59,15 @@ lib/config/app_config.dart
 
 # Backend secrets
 backend/.env
+backend/.admin_credentials
 backend/*.db
 backend/*.db-shm
 backend/*.db-wal
 
 # Imza sertifikalari / anahtarlar — asla commit etme
 upload_certificate.pem
+*.p8
+
 
 # Windows kisa yollari
 *.lnk

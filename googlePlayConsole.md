@@ -73,7 +73,27 @@ Bu doküman, **NevGenç** Android uygulamasının 1. sürümden itibaren (v1.0.0
    - `CalendarScreen` içerisindeki görevler başlığına **`🧹 Tamamlananları Sil`** butonu ve görev kartlarının sağ tarafına tekil silme ikonları eklendi.
 3. **Nihai Sürüm Derlemesi (`versionCode: 11` / `1.0.10+11`)**:
    - Projenin `pubspec.yaml`, `build.gradle.kts` ve `local.properties` dosyalarında sürüm bilgileri **`1.0.10+11`** olarak güncellendi.
-   - Temiz imzalı `app-release.aab` paketi üretildi.
+### ⚪ Sürüm 12 (`versionCode: 24` / `1.0.23+24`) — Android 15 Edge-to-Edge Uyumlaştırması
+
+1. **Uçtan Uca Ekran (Edge-to-Edge Display) Desteği ve Deprecated API Temizliği**:
+   - **Gereksinim / Uyarı**: Google Play Console'da beliren *"Uçtan uca ekran tüm kullanıcılara gösterilmeyebilir"* ve *"Desteği sonlandırılmış API'ler kullanılıyor"* uyarıları çözüldü.
+   - **Yapılan İşlem**:
+     - `lib/main.dart`: `SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge)` ve şeffaf durum/navigasyon çubuğu konfigürasyonları eklendi.
+     - `android/app/src/main/res/values/styles.xml` ve `values-night/styles.xml`: `android:navigationBarColor` ve `android:statusBarColor` alanları `@android:color/transparent` yapıldı.
+     - `MainActivity.kt`: `WindowCompat.setDecorFitsSystemWindows(window, false)` ile Android 15 pencere düzeni uyumlu hale getirildi.
+2. **Google Play Fotoğraf/Video İzin Politikası Uyumlaştırması (Photo Picker)**:
+   - **Gereksinim / Uyarı**: Google Play'in *"Fotoğraflar/videolar için alternatif sistem seçicileri kullanma"* Uyarısı/İhlali giderildi.
+   - **Yapılan İşlem**: `AndroidManifest.xml` dosyasından gereksiz `READ_MEDIA_IMAGES` ve `READ_EXTERNAL_STORAGE` izinleri kaldırıldı. Flutter'ın `image_picker` sistemi varsayılan Android Photo Picker mekanizması ile sıfır izin sorunuyla çalışmaktadır.
+
+### 🟢 Sürüm 13 (`versionCode: 25` / `1.0.24+25`) — Admin Topluluk Oluşturma ve Yönetim Modülü
+
+1. **Admin Paneli Topluluklar Sekmesi & Yeni Topluluk Oluşturma**:
+   - Admin Paneli (`AdminScreen`) içerisine 5. sekme olarak **`Topluluklar`** paneli eklendi.
+   - **Topluluk Oluşturma Dialogu**: Admin kullanıcısı topluluk logosu (galeriden seçme / otomatik Supabase Storage yükleme), topluluk adı, kategori (Teknoloji, Mühendislik, Sosyal vb.) ve topluluk hakkında bilgisi (açıklama) girerek tek tıkla yeni topluluk oluşturabilir.
+   - **Başkan Bağlama (Opsiyonel)**: Topluluk oluşturulurken isteğe bağlı olarak sistemdeki mevcut kullanıcılardan birine anında başkanlık tanımlanabilir.
+   - **Yönetim İşlemleri**: Tüm toplulukları filtreleme/arama, topluluk düzenleme ve topluluk silme eylemleri Admin paneline eklendi.
+2. **`SupabaseDataService` Veri Katmanı Güncellemeleri**:
+   - `createCommunity`, `updateCommunityDetails`, `deleteCommunity` metotları Supabase veritabanı ile tam entegre edildi.
 
 ---
 

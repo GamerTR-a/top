@@ -25,9 +25,12 @@ async function seed() {
         throw new Error('[seed] HATA: ADMIN_PASSWORD env değişkeni production ortamında zorunludur!');
       }
       adminPassword = crypto.randomBytes(14).toString('base64url');
+      // GÜVENLİK: Geçici şifre sadece .admin_credentials dosyasına yazılır (console.log DEĞİL)
+      const credPath = path.join(__dirname, '../../.admin_credentials');
+      fs.writeFileSync(credPath, `ADMIN_EMAIL=${adminEmail}\nADMIN_PASSWORD=${adminPassword}\n`, { mode: 0o600 });
       console.warn('\n⚠️  UYARI: ADMIN_PASSWORD ayarlanmamış!');
-      console.warn(`   Geçici şifre üretildi: ${adminPassword}`);
-      console.warn('   Bu şifreyi .env dosyanıza kaydedin: ADMIN_PASSWORD=<şifre>\n');
+      console.warn(`   Geçici şifre üretildi ve .admin_credentials dosyasına kaydedildi.`);
+      console.warn('   Bu dosyayı güvenli bir yere taşıyın ve içindeki değeri .env dosyanıza ekleyin.\n');
     }
 
     const adminExists = await dbGet('SELECT id FROM users WHERE email = ?', [adminEmail]);

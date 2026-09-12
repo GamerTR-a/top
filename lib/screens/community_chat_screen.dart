@@ -102,12 +102,12 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(
           platform == 'telegram' ? 'Telegram Grubu 📨' : 'Discord Sunucusu 🎧',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
         ),
         content: TextField(
           controller: urlCtrl,
           keyboardType: TextInputType.url,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: TextStyle(color: theme.textColor, fontSize: 14),
           decoration: InputDecoration(
             hintText:
                 platform == 'telegram'

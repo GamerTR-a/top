@@ -10,7 +10,11 @@ import '../models/post_model.dart';
 import '../models/discount_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/leaderboard_model.dart';
+import '../models/ticket_model.dart';
+import '../utils/file_validator.dart';
 import 'local_storage_service.dart';
+import 'location_service.dart';
+
 
 class SupabaseDataService {
   static final _db = Supabase.instance.client;
@@ -41,8 +45,9 @@ class SupabaseDataService {
 
   String get _uid {
     final uid = _db.auth.currentUser?.id;
-    if (uid == null)
+    if (uid == null) {
       throw StateError('Oturum süresi doldu. Lütfen tekrar giriş yapın.');
+    }
     return uid;
   }
 
@@ -326,7 +331,7 @@ class SupabaseDataService {
   }
 
   /// Başkan/admin: topluluk için bir platform bağlantısı ekler veya günceller.
-  /// Platform: 'telegram' | 'discord'
+  /// Platform: 'telegram' | 'discord' | 'whatsapp' | 'instagram'
   Future<void> setCommunityLink(
     int communityId,
     String platform,
@@ -346,6 +351,21 @@ class SupabaseDataService {
     );
   }
 
+  /// Başkan/admin: topluluk için harici platform bağlantılarını topluca günceller.
+  Future<void> updateCommunityLinks(
+    int communityId,
+    Map<String, String> links,
+  ) async {
+    for (final entry in links.entries) {
+      final platform = entry.key;
+      final url = entry.value.trim();
+      if (url.isNotEmpty) {
+        await setCommunityLink(communityId, platform, url);
+      }
+    }
+  }
+
+
   /// Başkan/admin: bir platform bağlantısını kaldırır.
   Future<void> removeCommunityLink(int communityId, String platform) async {
     await _db
@@ -353,6 +373,101 @@ class SupabaseDataService {
         .delete()
         .eq('community_id', communityId)
         .eq('platform', platform);
+  }
+
+  // ── Başkan/Admin: Topluluk detay güncelleme / silme ────────────────────────────
+
+  /// Topluluk detaylarını günceller (admin veya başkan RPC ile).
+  /// Not: RLS politikası admin yazmasına izin verir; başkan için RPC gerekir.
+  Future<void> updateCommunityDetails({
+    required int communityId,
+    required String name,
+    required String description,
+    required String category,
+    String? logoPath,
+  }) async {
+    final updates = <String, dynamic>{
+      'name': name,
+      'description': description,
+      'category': category,
+    };
+    if (logoPath != null && logoPath.isNotEmpty) {
+      updates['logo_path'] = logoPath;
+    }
+    await _db.from('communities').update(updates).eq('id', communityId);
+  }
+
+  /// Topluluğu siler (sadece admin).
+  Future<void> deleteCommunity(int communityId) async {
+    await _db.from('communities').delete().eq('id', communityId);
+  }
+
+  // ── Başkan: Topluluk üye / gönderi yönetimi ────────────────────────────────────
+
+  /// Topluluğun üyelerini döndürür (profil ve e-posta bilgileriyle birlikte).
+  Future<List<Map<String, dynamic>>> getCommunityMembers(int communityId) async {
+    try {
+      final res = await _db
+          .from('community_members')
+          .select('user_id, joined_at, profiles(id, name, email, profile_photo, xp, role, department)')
+          .eq('community_id', communityId)
+          .order('joined_at', ascending: true);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getCommunityMembers failed: $e');
+      return [];
+    }
+  }
+
+  /// Başkanın yönettiği topluluk(lar)ı döndürür.
+  Future<List<Topluluk>> getCommunitiesForBaskan(String userId) async {
+    try {
+      final res = await _db
+          .from('communities')
+          .select()
+          .eq('chairman_id', userId);
+      return (res as List)
+          .map((item) => Topluluk.fromApiJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getCommunitiesForBaskan failed: $e');
+      return [];
+    }
+  }
+
+
+  /// Topluluğun gönderilerini döndürür (moderation için).
+  Future<List<Map<String, dynamic>>> getCommunityPosts(int communityId) async {
+    try {
+      final res = await _db
+          .from('posts')
+          .select()
+          .eq('community_id', communityId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getCommunityPosts failed: $e');
+      return [];
+    }
+  }
+
+  /// Başkan/admin: topluluktan üye çıkarır.
+  Future<void> removeCommunityMember(int communityId, String userId) async {
+    await _db
+        .from('community_members')
+        .delete()
+        .eq('community_id', communityId)
+        .eq('user_id', userId);
+    // Sayacı azalt (best-effort)
+    await _db
+        .rpc('decrement_community_member', params: {'community_id': communityId})
+        .catchError((_) {});
+  }
+
+  /// Başkan/admin: gönderiyi siler.
+  Future<void> deletePost(int postId) async {
+    await _db.from('posts').delete().eq('id', postId);
   }
 
   Future<bool> isMember(int communityId) async {
@@ -517,6 +632,7 @@ class SupabaseDataService {
     required int communityId,
     required String content,
     String? imageUrl,
+    bool isEvent = false,
   }) async {
     if (content.isEmpty || content.length > 5000) {
       throw StateError('Gönderi içeriği 1-5000 karakter arasında olmalıdır.');
@@ -535,12 +651,54 @@ class SupabaseDataService {
           'user_id': _uid,
           'content': content,
           'status': 'published',
+          'is_event': isEvent,
           if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
         })
         .select()
         .single();
     return PostModel.fromApiJson(res);
   }
+
+  /// Etkinliğe katıl
+  Future<void> joinEvent(int postId) async {
+    try {
+      await _db.from('event_participants').upsert(
+        {'post_id': postId, 'user_id': _uid},
+        onConflict: 'post_id,user_id',
+      );
+    } catch (e) {
+      debugPrint('[SupabaseDataService] joinEvent failed: $e');
+    }
+  }
+
+  /// Etkinlikten ayrıl
+  Future<void> leaveEvent(int postId) async {
+    try {
+      await _db
+          .from('event_participants')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', _uid);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] leaveEvent failed: $e');
+    }
+  }
+
+  /// Etkinliğe katılan öğrencilerin listesi (Başkan Paneli için profil ve e-posta bilgileriyle)
+  Future<List<Map<String, dynamic>>> getEventParticipants(int postId) async {
+    try {
+      final res = await _db
+          .from('event_participants')
+          .select('user_id, created_at, profiles(id, name, email, department, profile_photo, role)')
+          .eq('post_id', postId)
+          .order('created_at', ascending: true);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getEventParticipants failed: $e');
+      return [];
+    }
+  }
+
 
   // ── Başkan toplulukları (gönderi oluştururken yalnızca kendi toplulukları) ──
 
@@ -652,9 +810,13 @@ class SupabaseDataService {
 
   // ── Görsel yükleme (Supabase Storage → public URL) ──────────────────────────
 
-  /// Görsel yükler. Öncelik Telegraph (ücretsiz, Supabase storage'ı büyütmez);
+  /// Görsel yükler (MIME/boyut sınırı kontrollü). Öncelik Telegraph;
   /// Telegraph başarısız olursa Supabase Storage'a düşer (fallback).
   Future<String> uploadPostImage(File file) async {
+    final validation = await FileValidator.validateFile(file);
+    if (!validation.isValid) {
+      throw ArgumentError(validation.errorMessage);
+    }
     try {
       final url = await _uploadPostImageToTelegraph(file);
       if (url != null) return url;
@@ -707,10 +869,12 @@ class SupabaseDataService {
 
   Future<List<DiscountModel>> getKuponlar() async {
     try {
-      final res = await _db.from('discounts').select();
+      final res =
+          await _db.from('discounts').select().order('id', ascending: false);
       final list = (res as List)
           .map((j) => DiscountModel.fromApiJson(j as Map<String, dynamic>))
           .toList();
+
       if (list.isNotEmpty) {
         unawaited(_cacheList(_keyKuponlar, res));
         return list;
@@ -720,6 +884,68 @@ class SupabaseDataService {
     }
     return _demoKuponlar;
   }
+
+  /// Konum tabanlı, atomic kupon hak etme işlemi (RPC claim_coupon)
+  Future<Map<String, dynamic>> claimCoupon({
+    required int discountId,
+    required double userLat,
+    required double userLng,
+    double merchantLat = 40.7408,
+    double merchantLng = 30.3333,
+    double geofenceRadiusMeters = 50.0,
+    String categoryPrefix = 'AB',
+    String merchantChar = 'X',
+  }) async {
+    try {
+      final response = await _db.rpc('claim_coupon', params: {
+        'p_discount_id': discountId,
+        'p_user_lat': userLat,
+        'p_user_lng': userLng,
+      });
+
+      if (response != null && response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseDataService] claimCoupon RPC fallback: $e');
+    }
+
+    // Fallback simülasyonu (Ağ/Çevrimdışı modu)
+    final distanceMeters = LocationService.distanceMeters(
+      userLat,
+      userLng,
+      merchantLat,
+      merchantLng,
+    );
+
+    if (distanceMeters > geofenceRadiusMeters) {
+      return {
+        'success': false,
+        'error': 'distance_too_far',
+        'distance_meters': distanceMeters,
+        'max_allowed_meters': geofenceRadiusMeters,
+        'message':
+            'İşletmeye yeterince yakın değilsiniz (${distanceMeters.toStringAsFixed(0)}m uzaktasınız). Kuponu açmak için 50m yakınına gelmelisiniz.',
+      };
+    }
+
+    // [Prefix: 2 Harf][Random: 2 Hane][MerchantID: 1 Harf][Random: 2 Hane] (Örn: AB12X34)
+    final nowMs = DateTime.now().microsecondsSinceEpoch;
+    final num1 = 10 + (nowMs % 90);
+    final num2 = 10 + ((nowMs ~/ 7) % 90);
+    final fallbackCode =
+        '${categoryPrefix.toUpperCase()}$num1${merchantChar.toUpperCase()}$num2';
+
+    return {
+      'success': true,
+      'code': fallbackCode,
+      'already_claimed': false,
+      'claimed_at': DateTime.now().toIso8601String(),
+      'distance_meters': distanceMeters,
+      'message': 'Tebrikler! Kupon kodunuz başarıyla açıldı.',
+    };
+  }
+
 
   /// Yerel önbellekteki kuponları anında döndürür (ağ beklemez).
   List<DiscountModel> getCachedKuponlar() =>
@@ -787,8 +1013,9 @@ class SupabaseDataService {
           .map((b) {
             if (b is! Map<String, dynamic>) return null;
             final badgeMap = b['badges'];
-            if (badgeMap == null || badgeMap is! Map<String, dynamic>)
+            if (badgeMap == null || badgeMap is! Map<String, dynamic>) {
               return null;
+            }
             return RozetModel(
               rozetAd: badgeMap['name'] as String? ?? '',
               ikon: badgeMap['icon'] as String? ?? '',
@@ -999,6 +1226,82 @@ class SupabaseDataService {
     }).toList();
   }
 
+  // ── Talep ve Şikayet Sistemi (User Tickets) ──────────────────────────────────
+
+  /// Kullanıcı: kendi taleplerini/şikayetlerini getirir (en yeni üstte).
+  Future<List<UserTicket>> getMyTickets() async {
+    try {
+      final uid = _uid;
+      final res = await _db
+          .from('user_tickets')
+          .select()
+          .eq('user_id', uid)
+          .order('created_at', ascending: false)
+          .limit(100);
+      return (res as List)
+          .map((j) => UserTicket.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getMyTickets failed: $e');
+      return [];
+    }
+  }
+
+  /// Kullanıcı: yeni talep/şikayet/öneri oluşturur.
+  Future<void> createTicket({
+    required String type,
+    required String subject,
+    required String description,
+  }) async {
+    final uid = _uid;
+    if (!UserTicket.validTypes.contains(type)) {
+      throw ArgumentError('Geçersiz talep türü: $type');
+    }
+    await _db.from('user_tickets').insert({
+      'user_id': uid,
+      'type': type,
+      'subject': subject.trim(),
+      'description': description.trim(),
+      'status': 'open',
+    });
+  }
+
+  /// Admin: tüm talepleri getirir (opsiyonel status filtresiyle).
+  Future<List<UserTicket>> getAllTickets({String? status}) async {
+    try {
+      var query = _db.from('user_tickets').select();
+      if (status != null && status.isNotEmpty && UserTicket.validStatuses.contains(status)) {
+        query = query.eq('status', status);
+      }
+      final res = await query.order('created_at', ascending: false).limit(200);
+      return (res as List)
+          .map((j) => UserTicket.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getAllTickets failed: $e');
+      return [];
+    }
+  }
+
+  /// Admin: talep durumunu ve admin notlarını günceller.
+  Future<void> updateTicketStatus({
+    required String ticketId,
+    required String status,
+    String? adminNotes,
+  }) async {
+    if (!UserTicket.validStatuses.contains(status)) {
+      throw ArgumentError('Geçersiz durum: $status');
+    }
+    final updates = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (adminNotes != null) {
+      updates['admin_notes'] = adminNotes.trim();
+    }
+    await _db.from('user_tickets').update(updates).eq('id', ticketId);
+  }
+
   /// Admin başkan seçici için tüm toplulukları taze getirir (önbellek/demo yok).
   Future<List<Topluluk>> getTopluluklarForAdmin() async {
     try {
@@ -1016,6 +1319,32 @@ class SupabaseDataService {
       debugPrint('[SupabaseDataService] getTopluluklarForAdmin failed: $e');
       rethrow;
     }
+  }
+
+  /// Admin paneli için yeni topluluk oluşturur.
+  Future<Topluluk> createCommunity({
+    required String name,
+    required String description,
+    required String category,
+    String? logoPath,
+    String? chairmanId,
+    String? chairmanName,
+  }) async {
+    final Map<String, dynamic> insertData = {
+      'name': name.trim(),
+      'description': description.trim(),
+      'category': category,
+      'logo_path': (logoPath != null && logoPath.isNotEmpty) ? logoPath : 'assets/gem.png',
+      'score': 80.0,
+      'member_count': 0,
+      'chairman_name': chairmanName ?? 'Belirtilmedi',
+    };
+    if (chairmanId != null && chairmanId.isNotEmpty) {
+      insertData['chairman_id'] = chairmanId;
+    }
+
+    final res = await _db.from('communities').insert(insertData).select().single();
+    return Topluluk.fromApiJson(res);
   }
 
   /// Admin: bir kullanıcıyı 'baskan' yapar ve bir topluluğa bağlar.
@@ -1135,4 +1464,301 @@ class SupabaseDataService {
           }),
     ]);
   }
+
+  // ── Bildirimler (Notification Center) ────────────────────────────────────────
+
+  /// Kullanıcının bildirimlerini sayfalı getirir.
+  Future<List<Map<String, dynamic>>> getNotifications({
+    required String userId,
+    int page = 0,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _db
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .range(page * limit, (page + 1) * limit - 1);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getNotifications failed: $e');
+      return [];
+    }
+  }
+
+  /// Bildirimi okundu olarak işaretler.
+  Future<void> markNotificationRead(String notificationId) async {
+    await _db.from('notifications').update({'is_read': true}).eq('id', notificationId);
+  }
+
+  /// Bildirimi siler.
+  Future<void> deleteNotification(String notificationId) async {
+    await _db.from('notifications').delete().eq('id', notificationId);
+  }
+
+  /// 30 günden eski okunmuş bildirimleri temizler.
+  Future<void> deleteOldReadNotifications(String userId) async {
+    final cutoff = DateTime.now().subtract(const Duration(days: 30)).toIso8601String();
+    await _db
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
+        .eq('is_read', true)
+        .lt('created_at', cutoff);
+  }
+
+  /// Realtime bildirim aboneliği.
+  RealtimeChannel subscribeToNotifications(String userId, Function(Map<String, dynamic>) onInsert) {
+    return _db
+        .channel('notifications:$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            onInsert(Map<String, dynamic>.from(payload.newRecord));
+          },
+        )
+        .subscribe();
+  }
+
+  // ── Analitik (Başkan Paneli) ────────────────────────────────────────────────
+
+  /// Topluluk genel istatistikleri
+  Future<Map<String, dynamic>> getCommunityStats(int communityId) async {
+    try {
+      final q1 = _db.from('community_members').select().eq('community_id', communityId).count(CountOption.exact);
+      final q2 = _db.from('posts').select().eq('community_id', communityId).count(CountOption.exact);
+      final q3 = _db.from('posts').select('support_count').eq('community_id', communityId);
+      final q4 = _db.from('posts').select('quality_score').eq('community_id', communityId);
+      final q5 = _db.from('events').select().eq('community_id', communityId).count(CountOption.exact);
+      final q6 = _db.from('posts').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String());
+      final q7 = _db.from('post_supports').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String());
+
+      final results = await Future.wait<dynamic>([q1, q2, q3, q4, q5, q6, q7]);
+
+      final totalMembers = (results[0] as dynamic).count ?? 0;
+      final totalPosts = (results[1] as dynamic).count ?? 0;
+      final posts = results[2] as List;
+      final qualityScores = results[3] as List;
+      final totalEvents = (results[4] as dynamic).count ?? 0;
+      final recentPostAuthors = (results[5] as List).map((p) => p['user_id']).toSet();
+      final recentSupporters = (results[6] as List).map((s) => s['user_id']).toSet();
+
+      final totalSupport = posts.fold<int>(0, (sum, p) => sum + ((p['support_count'] as num?)?.toInt() ?? 0));
+      final avgRating = qualityScores.isNotEmpty
+          ? qualityScores.fold<double>(0.0, (sum, p) => sum + ((p['quality_score'] as num?)?.toDouble() ?? 0.0)) / qualityScores.length
+          : 0.0;
+
+      final activeMembers = {...recentPostAuthors, ...recentSupporters}.length;
+      final activeRate = totalMembers > 0 ? activeMembers / totalMembers : 0.0;
+
+      return {
+        'total_members': totalMembers,
+        'total_posts': totalPosts,
+        'total_support': totalSupport,
+        'avg_rating': avgRating,
+        'total_events': totalEvents,
+        'active_members': activeMembers,
+        'active_member_rate': activeRate,
+      };
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getCommunityStats failed: $e');
+      return {
+        'total_members': 0,
+        'total_posts': 0,
+        'total_support': 0,
+        'avg_rating': 0.0,
+        'total_events': 0,
+        'active_members': 0,
+        'active_member_rate': 0.0,
+      };
+    }
+  }
+
+  /// Son 30 günlük üye büyüme trendi
+  Future<List<Map<String, dynamic>>> getMemberGrowthTrend(int communityId) async {
+    try {
+      final now = DateTime.now();
+      final thirtyDaysAgo = now.subtract(const Duration(days: 30)).toIso8601String();
+
+      final res = await _db
+          .from('community_members')
+          .select('joined_at')
+          .eq('community_id', communityId)
+          .gte('joined_at', thirtyDaysAgo)
+          .order('joined_at', ascending: true);
+
+      final Map<String, int> dailyCounts = {};
+      for (final r in (res as List)) {
+        final dateStr = (r['joined_at'] as String).substring(0, 10); // YYYY-MM-DD
+        dailyCounts[dateStr] = (dailyCounts[dateStr] ?? 0) + 1;
+      }
+
+      // Son 30 gün için her gün doldur
+      final result = <Map<String, dynamic>>[];
+      int cumulative = 0;
+      for (int i = 29; i >= 0; i--) {
+        final d = now.subtract(Duration(days: i));
+        final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        cumulative += dailyCounts[key] ?? 0;
+        result.add({
+          'date': key,
+          'label': '${d.day}/${d.month}',
+          'count': cumulative,
+        });
+      }
+      return result;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getMemberGrowthTrend failed: $e');
+      return [];
+    }
+  }
+
+  /// Son 7 günlük gönderi aktivitesi
+  Future<List<Map<String, dynamic>>> getPostActivityTrend(int communityId) async {
+    try {
+      final now = DateTime.now();
+      final sevenDaysAgo = now.subtract(const Duration(days: 7)).toIso8601String();
+
+      final res = await _db
+          .from('posts')
+          .select('created_at')
+          .eq('community_id', communityId)
+          .gte('created_at', sevenDaysAgo)
+          .order('created_at', ascending: true);
+
+      final Map<String, int> dailyCounts = {};
+      for (final r in (res as List)) {
+        final dateStr = (r['created_at'] as String).substring(0, 10);
+        dailyCounts[dateStr] = (dailyCounts[dateStr] ?? 0) + 1;
+      }
+
+      final result = <Map<String, dynamic>>[];
+      for (int i = 6; i >= 0; i--) {
+        final d = now.subtract(Duration(days: i));
+        final key = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        result.add({
+          'date': key,
+          'label': _weekdayShort(d.weekday),
+          'count': dailyCounts[key] ?? 0,
+        });
+      }
+      return result;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getPostActivityTrend failed: $e');
+      return [];
+    }
+  }
+
+  String _weekdayShort(int weekday) {
+    const days = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+    return days[weekday % 7];
+  }
+
+  /// En aktif üyeler (gönderi + destek sayısı)
+  Future<List<Map<String, dynamic>>> getTopActiveMembers(int communityId, {int limit = 10}) async {
+    try {
+      // Önce topluluk üyelerini al
+      final membersRes = await _db
+          .from('community_members')
+          .select('user_id')
+          .eq('community_id', communityId);
+      final memberIds = (membersRes as List).map((m) => m['user_id'] as String).toList();
+      if (memberIds.isEmpty) return [];
+
+      // Her üye için gönderi ve destek sayılarını al
+      final postsRes = await _db
+          .from('posts')
+          .select('user_id')
+          .eq('community_id', communityId)
+          .inFilter('user_id', memberIds);
+      final supportsRes = await _db
+          .from('post_supports')
+          .select('user_id')
+          .eq('community_id', communityId)
+          .inFilter('user_id', memberIds);
+
+      final Map<String, int> postCounts = {};
+      final Map<String, int> supportCounts = {};
+
+      for (final p in (postsRes as List)) {
+        postCounts[p['user_id']] = (postCounts[p['user_id']] ?? 0) + 1;
+      }
+      for (final s in (supportsRes as List)) {
+        supportCounts[s['user_id']] = (supportCounts[s['user_id']] ?? 0) + 1;
+      }
+
+      // Skorla sırala (gönderi * 2 + destek)
+      final scored = memberIds.map((id) {
+        final posts = postCounts[id] ?? 0;
+        final supports = supportCounts[id] ?? 0;
+        return {'user_id': id, 'post_count': posts, 'support_count': supports, 'score': posts * 2 + supports};
+      }).toList()
+        ..sort((a, b) => (b['score'] as int).compareTo(a['score'] as int));
+
+      // Profil bilgilerini getir
+      final topIds = scored.take(limit).map((e) => e['user_id']).toList();
+      final profilesRes = await _db
+          .from('profiles')
+          .select('id, name, profile_photo')
+          .inFilter('id', topIds);
+
+      final profileMap = {for (final p in (profilesRes as List)) p['id']: p};
+
+      return scored.take(limit).map((e) {
+        final profile = profileMap[e['user_id']] as Map<String, dynamic>? ?? {};
+        return {
+          'user_id': e['user_id'],
+          'post_count': e['post_count'],
+          'support_count': e['support_count'],
+          'profile': profile,
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getTopActiveMembers failed: $e');
+      return [];
+    }
+  }
+
+  /// Admin: Tüm kullanıcılara yeni sürüm / güncelleme bildirimi gönderir.
+  Future<void> sendUpdateAnnouncement({
+    required String title,
+    required String message,
+    String? version,
+    String? storeUrl,
+  }) async {
+    try {
+      final profiles = await _db.from('profiles').select('id');
+      final userIds = (profiles as List).map((p) => p['id'] as String).toList();
+
+      if (userIds.isNotEmpty) {
+        final rows = userIds.map((uid) => {
+          'user_id': uid,
+          'title': title,
+          'body': message,
+          'type': 'announcement',
+          'data': {
+            'version': version,
+            'store_url': storeUrl,
+            'is_update': true,
+          },
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        }).toList();
+
+        await _db.from('notifications').insert(rows);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseDataService] sendUpdateAnnouncement hatası: $e');
+      rethrow;
+    }
+  }
 }
+

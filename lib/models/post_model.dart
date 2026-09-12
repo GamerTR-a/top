@@ -12,6 +12,9 @@ class PostModel {
   final int? myRating;
   final bool isSupportedByMe;
   final String? etkinlikGorseli;
+  final bool isEvent;
+  final bool isEventJoined;
+  final int eventParticipantCount;
 
   const PostModel({
     required this.id,
@@ -27,6 +30,9 @@ class PostModel {
     this.ratingCount = 0,
     this.myRating,
     this.isSupportedByMe = false,
+    this.isEvent = false,
+    this.isEventJoined = false,
+    this.eventParticipantCount = 0,
   });
 
   static const Object _unset = Object();
@@ -38,6 +44,9 @@ class PostModel {
     int? ratingCount,
     Object? myRating = _unset,
     bool? isSupportedByMe,
+    bool? isEvent,
+    bool? isEventJoined,
+    int? eventParticipantCount,
   }) {
     return PostModel(
       id: id,
@@ -53,6 +62,9 @@ class PostModel {
       ratingCount: ratingCount ?? this.ratingCount,
       myRating: identical(myRating, _unset) ? this.myRating : myRating as int?,
       isSupportedByMe: isSupportedByMe ?? this.isSupportedByMe,
+      isEvent: isEvent ?? this.isEvent,
+      isEventJoined: isEventJoined ?? this.isEventJoined,
+      eventParticipantCount: eventParticipantCount ?? this.eventParticipantCount,
     );
   }
 
@@ -70,6 +82,10 @@ class PostModel {
       kalitePuani: (json['quality_score'] as num?)?.toDouble() ?? 0.0,
       ratingAvg: (json['rating_avg'] as num?)?.toDouble() ?? 0.0,
       ratingCount: (json['rating_count'] as num?)?.toInt() ?? 0,
+      isEvent: json['is_event'] as bool? ?? false,
+      isEventJoined: json['is_event_joined'] as bool? ?? false,
+      eventParticipantCount: (json['event_participant_count'] as num?)?.toInt() ?? 0,
     );
   }
 }
+

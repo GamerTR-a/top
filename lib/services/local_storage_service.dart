@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_user_model.dart';
+import '../models/memory_gallery_model.dart';
 
 /// Centralized Local Storage Service for Offline-First Mobile Persistence
 /// Complies with Google Play Store Scoped Storage & Local Privacy Guidelines.
@@ -35,6 +36,9 @@ class LocalStorageService {
   static const String keyCachedKuponlar = 'offline_cached_kuponlar_v1';
   static const String keyCachedEtkinlikler = 'offline_cached_etkinlikler_v1';
   static const String keyCachedTopluluklar = 'offline_cached_topluluklar_v1';
+
+  // --- Hatıra Galerisi (Memory Gallery) ---
+  static const String _keyMemoryAlbums = 'memory_albums_v1';
 
   // --- Privacy Policy Acceptance ---
   bool get isPrivacyPolicyAccepted => _prefs?.getBool(_keyPrivacyAccepted) ?? false;
@@ -162,5 +166,86 @@ class LocalStorageService {
 
   Future<bool> clearAllCache() async {
     return await _prefs?.clear() ?? false;
+  }
+
+  // ── Hatıra Galerisi (Memory Gallery) ─────────────────────────────────────
+
+  /// Tüm albümleri getir (en yeni üstte)
+  Future<List<MemoryAlbum>> getMemoryAlbums() async {
+    final jsonStr = getString(_keyMemoryAlbums);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(jsonStr);
+      final albums = decoded
+          .map((e) => MemoryAlbum.fromJson(Map<String, dynamic>.from(e)))
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return albums;
+    } catch (e) {
+      debugPrint('LocalStorageService error reading memory albums: $e');
+      return [];
+    }
+  }
+
+  /// Albümleri kaydet
+  Future<bool> saveMemoryAlbums(List<MemoryAlbum> albums) async {
+    try {
+      final jsonStr = jsonEncode(albums.map((a) => a.toJson()).toList());
+      return await setString(_keyMemoryAlbums, jsonStr);
+    } catch (e) {
+      debugPrint('LocalStorageService error saving memory albums: $e');
+      return false;
+    }
+  }
+
+  /// Yeni albüm oluştur
+  Future<MemoryAlbum?> createAlbum(String name) async {
+    if (name.trim().isEmpty) return null;
+    final albums = await getMemoryAlbums();
+    final newAlbum = MemoryAlbum(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name.trim(),
+      photoPaths: [],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    albums.insert(0, newAlbum);
+    await saveMemoryAlbums(albums);
+    return newAlbum;
+  }
+
+  /// Albüm sil
+  Future<bool> deleteAlbum(String albumId) async {
+    final albums = await getMemoryAlbums();
+    albums.removeWhere((a) => a.id == albumId);
+    return await saveMemoryAlbums(albums);
+  }
+
+  /// Albüm adını güncelle
+  Future<bool> renameAlbum(String albumId, String newName) async {
+    if (newName.trim().isEmpty) return false;
+    final albums = await getMemoryAlbums();
+    final index = albums.indexWhere((a) => a.id == albumId);
+    if (index == -1) return false;
+    albums[index] = albums[index].copyWith(name: newName.trim(), updatedAt: DateTime.now());
+    return await saveMemoryAlbums(albums);
+  }
+
+  /// Albüme fotoğraf ekle
+  Future<bool> addPhotoToAlbum(String albumId, String photoPath) async {
+    final albums = await getMemoryAlbums();
+    final index = albums.indexWhere((a) => a.id == albumId);
+    if (index == -1) return false;
+    albums[index] = albums[index].addPhoto(photoPath);
+    return await saveMemoryAlbums(albums);
+  }
+
+  /// Albümden fotoğraf sil
+  Future<bool> removePhotoFromAlbum(String albumId, String photoPath) async {
+    final albums = await getMemoryAlbums();
+    final index = albums.indexWhere((a) => a.id == albumId);
+    if (index == -1) return false;
+    albums[index] = albums[index].removePhoto(photoPath);
+    return await saveMemoryAlbums(albums);
   }
 }

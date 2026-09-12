@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/topluluk.dart';
+import '../models/auth_user_model.dart';
 import '../theme/app_theme.dart';
 import '../screens/community_detail_screen.dart';
 import '../services/joined_communities_service.dart';
@@ -7,8 +8,9 @@ import 'app_network_image.dart';
 
 class GlassCard extends StatefulWidget {
   final Topluluk topluluk;
+  final AuthUser? currentUser;
 
-  const GlassCard({super.key, required this.topluluk});
+  const GlassCard({super.key, required this.topluluk, this.currentUser});
 
   @override
   State<GlassCard> createState() => _GlassCardState();
@@ -96,7 +98,7 @@ class _GlassCardState extends State<GlassCard> {
         return GestureDetector(
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (_) => CommunityDetailScreen(topluluk: t),
+              builder: (_) => CommunityDetailScreen(topluluk: t, currentUser: widget.currentUser),
             ),
           ),
           child: AnimatedContainer(

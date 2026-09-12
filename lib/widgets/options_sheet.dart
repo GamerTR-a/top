@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import '../screens/sosyo_screen.dart';
 import '../screens/admin_screen.dart';
+import '../screens/baskan_panel_screen.dart';
 import '../screens/theme_customizer_screen.dart';
 import '../screens/privacy_policy_screen.dart';
 import '../screens/campus_map_screen.dart';
 import '../screens/games/game_room_screen.dart';
+import '../screens/ticket_list_screen.dart';
 import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
 
 class OptionsSheet extends StatelessWidget {
   final bool isAdmin;
+  final bool isBaskan;
   final String userName;
   final Future<void> Function()? onLogout;
   final bool isSettings;
@@ -17,10 +20,12 @@ class OptionsSheet extends StatelessWidget {
   const OptionsSheet({
     super.key,
     this.isAdmin = false,
+    this.isBaskan = false,
     this.userName = '',
     this.onLogout,
     this.isSettings = false,
   });
+
 
   Widget _buildMenuItem(
     BuildContext context,
@@ -249,7 +254,13 @@ class OptionsSheet extends StatelessWidget {
                   'Talep ve Şikayetler',
                   Icons.feedback_outlined,
                   const Color(0xFFFF9800),
-                  onTap: () => _showComingSoon(context, 'Talep ve Şikayetler'),
+                  onTap: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.push(
+                      MaterialPageRoute(builder: (_) => const TicketListScreen()),
+                    );
+                  },
                 ),
                 if (onLogout != null)
                   _buildMenuItem(
@@ -328,6 +339,22 @@ class OptionsSheet extends StatelessWidget {
                     );
                   },
                 ),
+                if (isAdmin || isBaskan)
+                  _buildMenuItem(
+                    context,
+                    'Başkan Paneli',
+                    Icons.workspace_premium_outlined,
+                    const Color(0xFF43A047),
+                    onTap: () {
+                      final nav = Navigator.of(context);
+                      nav.pop();
+                      nav.push(
+                        MaterialPageRoute(
+                          builder: (_) => const BaskanPanelScreen(),
+                        ),
+                      );
+                    },
+                  ),
                 if (isAdmin)
                   _buildMenuItem(
                     context,
@@ -344,6 +371,7 @@ class OptionsSheet extends StatelessWidget {
                       );
                     },
                   ),
+
               ],
               const SizedBox(height: 16),
             ],

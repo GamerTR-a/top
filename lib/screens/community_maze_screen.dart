@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/topluluk.dart';
+import '../models/auth_user_model.dart';
 import '../services/supabase_data_service.dart';
 import '../widgets/glass_card.dart';
 import '../widgets/animated_theme_background.dart';
 import '../theme/app_theme.dart';
 
 class CommunityMazeScreen extends StatefulWidget {
-  const CommunityMazeScreen({super.key});
+  final AuthUser? currentUser;
+  const CommunityMazeScreen({super.key, this.currentUser});
 
   @override
   State<CommunityMazeScreen> createState() => _CommunityMazeScreenState();
@@ -311,7 +313,7 @@ class _CommunityMazeScreenState extends State<CommunityMazeScreen> {
                           ),
                           itemCount: filtered.length,
                           itemBuilder: (context, index) =>
-                              GlassCard(topluluk: filtered[index]),
+                              GlassCard(topluluk: filtered[index], currentUser: widget.currentUser),
                         ),
                       );
                     },
