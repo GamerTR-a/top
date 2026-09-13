@@ -41,12 +41,27 @@ jobs:
           pod install --repo-update || pod install || true
           cd ..
 
-      - name: IPA derle (imzasiz)
-        run: flutter build ipa --no-codesign
+      - name: IPA ve Archive Derle (imzasiz)
+        run: |
+          flutter build ios --release --config-only
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath ../build/ios/archive/Runner.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" archive
+          
+          mkdir -p ../build/ios/ipa
+          cd ../build/ios/archive/Runner.xcarchive/Products/Applications
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -r ../../../../ipa/NevGenc.ipa Payload
 
       - name: IPA dosyasini artifact olarak yukle
         uses: actions/upload-artifact@v4
         with:
           name: newgenc-ipa
-          path: build/ios/ipa/*.ipa
+          path: build/ios/ipa/NevGenc.ipa
           if-no-files-found: error
