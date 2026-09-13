@@ -29,16 +29,19 @@ jobs:
           channel: stable
           cache: true
 
-      - name: iOS platformunu etkinlestir
-        run: flutter config --enable-ios
+      - name: Disable Swift Package Manager & Enable iOS
+        run: |
+          flutter config --no-enable-swift-package-manager
+          flutter config --enable-ios
 
-      - name: Bagimliliklari indir
-        run: flutter pub get
+      - name: Bagimliliklari ve Pod'lari indir
+        run: |
+          flutter pub get
+          cd ios
+          pod install || true
+          cd ..
 
       - name: IPA derle (imzasiz)
-        # Imzasiz derlenir -> cihaz testi / daha sonra imzalama.
-        # Apple Developer hesabi + imza gizlileri eklendiginde
-        # "--no-codesign" kaldirilip imzali derleme yapilir.
         run: flutter build ipa --no-codesign
 
       - name: IPA dosyasini artifact olarak yukle
