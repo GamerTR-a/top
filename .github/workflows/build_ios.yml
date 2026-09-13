@@ -8,7 +8,7 @@ on:
 jobs:
   build-ios:
     name: Build & Upload iOS App
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout Repository
@@ -27,7 +27,7 @@ jobs:
         run: |
           flutter pub get
           cd ios
-          pod install || true
+          pod install --repo-update || pod install || true
 
 
       - name: Install App Store Connect API Key
