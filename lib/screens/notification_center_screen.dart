@@ -95,13 +95,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
   Future<void> _markAsRead(String notificationId) async {
     try {
       await _svc.markNotificationRead(notificationId);
+      if (!mounted) return;
       setState(() {
         final idx = _notifications.indexWhere((n) => n['id'] == notificationId);
         if (idx != -1) {
           _notifications[idx]['is_read'] = true;
         }
       });
-    } catch (_) {}
+    } catch (_) {
+      // Sessizce başarısız olur — bildirim "okundu" işaretlenmemiş kalır,
+      // bir sonraki açılışta tekrar denenebilir; kritik bir veri kaybı yok.
+    }
   }
 
   Future<void> _markAllAsRead() async {
@@ -110,8 +114,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
         .map((n) => n['id'] as String)
         .toList();
     for (final id in unreadIds) {
-      await _svc.markNotificationRead(id);
+      try {
+        await _svc.markNotificationRead(id);
+      } catch (_) {
+        // Bir bildirim başarısız olsa da diğerlerini işaretlemeye devam et.
+      }
+      if (!mounted) return;
     }
+    if (!mounted) return;
     setState(() {
       for (final n in _notifications) {
         n['is_read'] = true;
@@ -144,6 +154,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
       case 'post_rated': return Icons.star_rounded;
       case 'badge_earned': return Icons.emoji_events_rounded;
       case 'announcement': return Icons.campaign_rounded;
+      case 'community': return Icons.workspace_premium_rounded;
       default: return Icons.notifications_rounded;
     }
   }
@@ -158,6 +169,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
       case 'post_rated': return theme.warning;
       case 'badge_earned': return Colors.amber;
       case 'announcement': return theme.secondary;
+      case 'community': return theme.primary;
       default: return theme.textMuted;
     }
   }
@@ -183,6 +195,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
                 onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Geri',
               ),
               title: Text('Bildirimler', style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold, fontSize: 17)),
               actions: [
@@ -351,6 +364,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
           final color = _colorForType(type, theme);
 
           return _NotificationCard(
+            id: n['id'] as String? ?? '$index-$createdAt',
             theme: theme,
             icon: icon,
             color: color,
@@ -360,7 +374,23 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
             isRead: isRead,
             onTap: () => _handleNotificationTap(n),
             onDismiss: () async {
-              await _svc.deleteNotification(n['id'] as String);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await _svc.deleteNotification(n['id'] as String);
+              } catch (_) {
+                // Silme sunucuda başarısız oldu — Dismissible öğeyi zaten
+                // görsel olarak kaldırdığından geri getirmiyoruz (kafa
+                // karıştırıcı olur), ama kullanıcıyı bilgilendiriyoruz;
+                // bir sonraki yenilemede bildirim tekrar görünebilir.
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Bildirim silinemedi, tekrar denenecek.'),
+                    ),
+                  );
+                }
+              }
+              if (!mounted) return;
               setState(() => _notifications.remove(n));
             },
           );
@@ -505,6 +535,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen>
 }
 
 class _NotificationCard extends StatelessWidget {
+  final String id;
   final AppTheme theme;
   final IconData icon;
   final Color color;
@@ -516,6 +547,7 @@ class _NotificationCard extends StatelessWidget {
   final VoidCallback onDismiss;
 
   const _NotificationCard({
+    required this.id,
     required this.theme,
     required this.icon,
     required this.color,
@@ -530,7 +562,10 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dismissible(
-      key: ValueKey(title + time),
+      // Gerçek bildirim id'si kullanılıyor (bkz. kontrol.md Bölüm 18.2) —
+      // önceden title+time birleşimiydi, aynı başlık/saniyeye sahip iki
+      // bildiride teorik anahtar çakışması riski taşıyordu.
+      key: ValueKey(id),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,

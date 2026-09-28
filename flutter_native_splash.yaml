@@ -1,0 +1,21 @@
+# NevGenç native splash ekranı yapılandırması.
+# kontrol.md Bölüm 17.3/18.5 — açılışta runApp() öncesi sıralı await'ler
+# (Firebase, LocalStorage, Supabase.initialize) ilk kareyi geciktiriyordu ve
+# bu sürede sistem varsayılan (beyaz/boş) ekran görünüyordu. Native splash,
+# bu süre boyunca marka logosunu gösterip algılanan açılış süresini iyileştirir.
+#
+# Değişiklik sonrası yeniden üretmek için:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#050714"
+  color_dark: "#050714"
+  image: assets/app_logo.png
+  image_dark: assets/app_logo.png
+  android_12:
+    color: "#050714"
+    color_dark: "#050714"
+    image: assets/app_logo.png
+    image_dark: assets/app_logo.png
+  android: true
+  ios: true
+  web: false

@@ -4,6 +4,8 @@ import '../screens/admin_screen.dart';
 import '../screens/baskan_panel_screen.dart';
 import '../screens/theme_customizer_screen.dart';
 import '../screens/privacy_policy_screen.dart';
+import '../screens/notification_privacy_settings_screen.dart';
+import '../screens/my_data_screen.dart';
 import '../screens/campus_map_screen.dart';
 import '../screens/games/game_room_screen.dart';
 import '../screens/ticket_list_screen.dart';
@@ -245,6 +247,34 @@ class OptionsSheet extends StatelessWidget {
                     nav.push(
                       MaterialPageRoute(
                         builder: (_) => const PrivacyPolicyScreen(),
+                      ),
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  'Verilerim',
+                  Icons.folder_shared_outlined,
+                  const Color(0xFF9C27B0),
+                  onTap: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.push(
+                      MaterialPageRoute(builder: (_) => const MyDataScreen()),
+                    );
+                  },
+                ),
+                _buildMenuItem(
+                  context,
+                  'Bildirim ve Gizlilik Tercihleri',
+                  Icons.notifications_active_outlined,
+                  const Color(0xFF2196F3),
+                  onTap: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationPrivacySettingsScreen(),
                       ),
                     );
                   },

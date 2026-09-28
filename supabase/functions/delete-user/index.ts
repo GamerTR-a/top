@@ -58,15 +58,19 @@ serve(async (req) => {
     const admin = createClient(supabaseUrl, serviceKey);
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr) {
+      // İç hata detayını yalnızca sunucu loguna yaz — client'a genel mesaj dön
+      // (bkz. güvenlik denetimi: "iç detay sızdıran hata mesajları").
+      console.error("delete-user: admin.deleteUser failed", delErr);
       // auth kaydı yoksa yine de profiles satırını temizlemeyi dene
       await admin.from("profiles").delete().eq("id", userId);
-      return json({ error: delErr.message }, 500);
+      return json({ error: "Kullanıcı silinemedi. Lütfen tekrar deneyin." }, 500);
     }
     // FK cascade yoksa profiles satırı kalmış olabilir — garanti için sil
     await admin.from("profiles").delete().eq("id", userId);
 
     return json({ ok: true });
   } catch (err) {
-    return json({ error: String(err) }, 500);
+    console.error("delete-user: unhandled error", err);
+    return json({ error: "Beklenmeyen bir hata oluştu." }, 500);
   }
 });

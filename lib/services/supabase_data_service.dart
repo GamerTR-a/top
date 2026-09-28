@@ -11,9 +11,11 @@ import '../models/discount_model.dart';
 import '../models/user_profile_model.dart';
 import '../models/leaderboard_model.dart';
 import '../models/ticket_model.dart';
+import '../models/news_model.dart';
+import '../models/job_listing_model.dart';
 import '../utils/file_validator.dart';
+import '../utils/image_sanitizer.dart';
 import 'local_storage_service.dart';
-import 'location_service.dart';
 
 
 class SupabaseDataService {
@@ -24,6 +26,9 @@ class SupabaseDataService {
   static const String _keyKuponlar = LocalStorageService.keyCachedKuponlar;
   static const String _keyEtkinlikler = LocalStorageService.keyCachedEtkinlikler;
   static const String _keyTopluluklar = LocalStorageService.keyCachedTopluluklar;
+  static const String _keyNews = LocalStorageService.keyCachedNews;
+  static const String _keyJobListings = LocalStorageService.keyCachedJobListings;
+  static const String _keyMenuItems = LocalStorageService.keyCachedMenuItems;
 
   /// Başarılı ağ yanıtını arka planda yerel önbelleğe yazar (asla bloklamaz).
   Future<void> _cacheList(String key, List<dynamic> rows) async {
@@ -52,10 +57,14 @@ class SupabaseDataService {
   }
 
   // ── Yardımcı: ISO haftası ────────────────────────────────────────────────────
-  static int _isoWeek(DateTime d) {
+  // Public (isim alttizgisiz) — birim testinden çağrılabilmesi için (bkz.
+  // kontrol.md Bölüm 30.1). Not: sunucu artık bu değeri kendi hesaplayıp
+  // istemcinin gönderdiğini yok sayıyor (Bölüm 8.8) — bu fonksiyon yalnızca
+  // istemci tarafı anlık gösterim için kullanılıyor.
+  static int isoWeek(DateTime d) {
     final jan4 = DateTime(d.year, 1, 4);
     final startOfWeek1 = jan4.subtract(Duration(days: jan4.weekday - 1));
-    if (d.isBefore(startOfWeek1)) return _isoWeek(DateTime(d.year - 1, 12, 28));
+    if (d.isBefore(startOfWeek1)) return isoWeek(DateTime(d.year - 1, 12, 28));
     return ((d.difference(startOfWeek1).inDays) ~/ 7) + 1;
   }
 
@@ -66,231 +75,43 @@ class SupabaseDataService {
     String? category,
     String sort = 'score',
     int page = 1,
-    int limit = 50,
+    // PostgREST'in varsayılan max-rows sınırı; topluluk listesi ekranları
+    // sayfalama yapmadığı için tümü tek seferde gelmeli.
+    int limit = 1000,
   }) async {
-    try {
-      var query = _db.from('communities').select();
-      if (search != null && search.isNotEmpty) {
-        query = query.ilike('name', '%$search%');
-      }
-      if (category != null && category.isNotEmpty) {
-        query = query.eq('category', category);
-      }
-      final res = await query
-          .order(sort, ascending: false)
-          .range((page - 1) * limit, page * limit - 1);
-      final list = (res as List)
-          .map((j) => Topluluk.fromApiJson(j as Map<String, dynamic>))
-          .toList();
-      if (list.isNotEmpty) {
-        // Yalnızca varsayılan (filtresiz) liste önbelleğe alınır.
-        if ((search == null || search.isEmpty) &&
-            (category == null || category.isEmpty) &&
-            page == 1) {
-          unawaited(_cacheList(_keyTopluluklar, res));
-        }
-        return list;
-      }
-    } catch (e) {
-      debugPrint('[SupabaseDataService] getTopluluklar fallback triggered: $e');
+    // Not: hata BİLEREK yutulup sahte/demo topluluk listesi döndürülmüyor —
+    // önceki sürüm bir ağ hatasında (ya da gerçekten 0 sonuç dönse bile)
+    // kullanıcıya bunun gerçek veri olduğuna dair hiçbir işaret vermeden
+    // uydurma içerik gösteriyordu (bkz. kontrol.md Bölüm 14.9 / 16.3).
+    // Hata durumunda çağıran taraf zaten yerel önbelleği (getCachedTopluluklar)
+    // gösterip arka planda bunu deniyor; başarısız olursa mevcut/boş hata
+    // durumunu koruyor.
+    var query = _db.from('communities').select();
+    if (search != null && search.isNotEmpty) {
+      query = query.ilike('name', '%$search%');
     }
-    return _demoTopluluklar.where((t) {
-      if (search != null && search.isNotEmpty && !t.ad.toLowerCase().contains(search.toLowerCase())) {
-        return false;
-      }
-      if (category != null && category.isNotEmpty && t.kategori != category) {
-        return false;
-      }
-      return true;
-    }).toList();
+    if (category != null && category.isNotEmpty) {
+      query = query.eq('category', category);
+    }
+    final res = await query
+        .order(sort, ascending: false)
+        .range((page - 1) * limit, page * limit - 1);
+    final list = (res as List)
+        .map((j) => Topluluk.fromApiJson(j as Map<String, dynamic>))
+        .toList();
+    // Yalnızca varsayılan (filtresiz) liste önbelleğe alınır.
+    if (list.isNotEmpty &&
+        (search == null || search.isEmpty) &&
+        (category == null || category.isEmpty) &&
+        page == 1) {
+      unawaited(_cacheList(_keyTopluluklar, res));
+    }
+    return list;
   }
 
   /// Yerel önbellekteki toplulukları anında döndürür (ağ beklemez).
   List<Topluluk> getCachedTopluluklar() =>
       _readCache(_keyTopluluklar).map(Topluluk.fromApiJson).toList();
-
-  static final List<Topluluk> _demoTopluluklar = [
-    Topluluk(
-      id: 1,
-      ad: 'Girişimci Mühendisler Topluluğu',
-      kategori: 'Mühendislik',
-      aciklama: 'SUBÜ ve SAÜ ortak girişimcilik ve inovasyon topluluğu.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 420,
-      puan: 95.0,
-      baskanAdi: 'Ahmet Safa Zengin',
-    ),
-    Topluluk(
-      id: 2,
-      ad: 'Bilişim Sistemleri Mühendisliği Topluluğu',
-      kategori: 'Teknoloji',
-      aciklama: 'Yazılım, yapay zeka ve siber güvenlik projeleri geliştiriyoruz.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 310,
-      puan: 88.0,
-      baskanAdi: 'Melik Mirza Çelik',
-    ),
-    Topluluk(
-      id: 3,
-      ad: 'Tarih Öğrenci Topluluğu',
-      kategori: 'Sosyal',
-      aciklama: 'Tarih, kültür gezileri ve akademik söyleşiler.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 215,
-      puan: 82.0,
-      baskanAdi: 'İbrahim Gece',
-    ),
-    Topluluk(
-      id: 4,
-      ad: 'Damla Öğrenci Topluluğu',
-      kategori: 'Sosyal Sorumluluk',
-      aciklama: 'Gönüllülük faaliyetleri ve iyilik projeleri.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 180,
-      puan: 79.0,
-      baskanAdi: 'Aygül Aladı',
-    ),
-    Topluluk(
-      id: 5,
-      ad: 'Yazılım ve Yapay Zeka Topluluğu',
-      kategori: 'Teknoloji',
-      aciklama: 'Python, makine öğrenmesi ve açık kaynak kod projeleri geliştiriyoruz.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 530,
-      puan: 92.5,
-      baskanAdi: 'Zeynep Yılmaz',
-    ),
-    Topluluk(
-      id: 6,
-      ad: 'Siber Güvenlik ve Hacking Kulübü',
-      kategori: 'Teknoloji',
-      aciklama: 'CTF yarışmaları, sızma testleri ve ağ güvenliği atölyeleri.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 380,
-      puan: 91.0,
-      baskanAdi: 'Emre Kaya',
-    ),
-    Topluluk(
-      id: 7,
-      ad: 'IEEE Student Branch Sakarya',
-      kategori: 'Mühendislik',
-      aciklama: 'Otonom araçlar, robotiğin temelleri ve uluslararası teknik konferanslar.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 620,
-      puan: 96.0,
-      baskanAdi: 'Elif Demir',
-    ),
-    Topluluk(
-      id: 8,
-      ad: 'Siber & E-Spor Topluluğu',
-      kategori: 'Spor',
-      aciklama: 'Valorant, LoL ve CS2 üniversiteler arası lig turnuvaları.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 490,
-      puan: 89.0,
-      baskanAdi: 'Oğuzhan Bulut',
-    ),
-    Topluluk(
-      id: 9,
-      ad: 'Doğa Sporları ve Dağcılık Kulübü (SAÜDAK)',
-      kategori: 'Doğa & Gezi',
-      aciklama: 'Trekking, kampçılık, kaya tırmanışı ve zirve tırmanış etkinlikleri.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 340,
-      puan: 87.5,
-      baskanAdi: 'Burak Arslan',
-    ),
-    Topluluk(
-      id: 10,
-      ad: 'Müzik ve Enstrüman Topluluğu',
-      kategori: 'Sanat & Müzik',
-      aciklama: 'Kampüs konserleri, jam sessionlar ve akustik grup performansları.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 290,
-      puan: 85.0,
-      baskanAdi: 'Selin Avcı',
-    ),
-    Topluluk(
-      id: 11,
-      ad: 'Tiyatro ve Sahne Sanatları Kulübü',
-      kategori: 'Sanat & Müzik',
-      aciklama: 'Oyun gösterimleri, pandomim ve beden dili drama eğitimi.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 210,
-      puan: 83.5,
-      baskanAdi: 'Kaan Öztürk',
-    ),
-    Topluluk(
-      id: 12,
-      ad: 'Fotoğrafçılık ve Sinema Topluluğu',
-      kategori: 'Kültür',
-      aciklama: 'Foto safari turları, kısa film çekimleri ve senaryo atölyesi.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 265,
-      puan: 86.0,
-      baskanAdi: 'Deniz Yıldız',
-    ),
-    Topluluk(
-      id: 13,
-      ad: 'Gökbilim ve Uzay Teknolojileri',
-      kategori: 'Bilim',
-      aciklama: 'Teleskopla gökyüzü gözlemleri, model roket ve uydu projeleri.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 310,
-      puan: 90.0,
-      baskanAdi: 'Mert Şahin',
-    ),
-    Topluluk(
-      id: 14,
-      ad: 'Genç Kızılay ve Arama Kurtarma Topluluğu',
-      kategori: 'Sosyal Sorumluluk',
-      aciklama: 'Kan bağışı kampanyaları, ilk yardım eğitimi ve afet hazırlığı.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 450,
-      puan: 94.0,
-      baskanAdi: 'Fatma Yücel',
-    ),
-    Topluluk(
-      id: 15,
-      ad: 'Kariyer ve Finans Kulübü',
-      kategori: 'Kariyer',
-      aciklama: 'CEO söyleşileri, CV hazırlama teknikleri ve borsa analizi.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 370,
-      puan: 88.5,
-      baskanAdi: 'Caner Güneş',
-    ),
-    Topluluk(
-      id: 16,
-      ad: 'Felsefe ve Düşünce Topluluğu',
-      kategori: 'Kültür',
-      aciklama: 'Kitap analizleri, etik tartışmaları ve açık oturum panelleri.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 175,
-      puan: 81.0,
-      baskanAdi: 'Ecem Özkan',
-    ),
-    Topluluk(
-      id: 17,
-      ad: 'Biyomedikal ve Biyoteknoloji Topluluğu',
-      kategori: 'Mühendislik',
-      aciklama: 'Tıbbi cihaz tasarımı, genetik mühendisliği ve protez Ar-Ge.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 230,
-      puan: 89.5,
-      baskanAdi: 'Tarkan Aksoy',
-    ),
-    Topluluk(
-      id: 18,
-      ad: 'Satranç ve Zeka Oyunları Kulübü',
-      kategori: 'Spor',
-      aciklama: 'Haftalık satranç turnuvaları, Go ve zeka oyunları ligi.',
-      logoPath: 'assets/gem.png',
-      uyeSayisi: 195,
-      puan: 84.0,
-      baskanAdi: 'Barış Erdem',
-    ),
-  ];
 
   Future<Map<String, dynamic>> getCommunityActivities(int communityId) async {
     try {
@@ -405,18 +226,67 @@ class SupabaseDataService {
   // ── Başkan: Topluluk üye / gönderi yönetimi ────────────────────────────────────
 
   /// Topluluğun üyelerini döndürür (profil ve e-posta bilgileriyle birlikte).
+  ///
+  /// E-posta `profiles`'ta değil `auth.users`'ta durduğu için yetki kontrollü
+  /// `get_community_members_detailed` RPC'si kullanılır (yalnızca o topluluğun
+  /// başkanı/admin). RPC yoksa e-postasız profil join'ine düşülür.
+  /// Dönen her satır: {user_id, joined_at, name, profiles: {id, name, email,
+  /// profile_photo, xp, role, department(String)}}.
   Future<List<Map<String, dynamic>>> getCommunityMembers(int communityId) async {
+    try {
+      final res = await _db.rpc(
+        'get_community_members_detailed',
+        params: {'p_community_id': communityId},
+      );
+      return _normalizePersonRows(res, dateKey: 'joined_at');
+    } catch (e) {
+      debugPrint('[SupabaseDataService] get_community_members_detailed failed: $e');
+    }
     try {
       final res = await _db
           .from('community_members')
-          .select('user_id, joined_at, profiles(id, name, email, profile_photo, xp, role, department)')
+          .select('user_id, joined_at, profiles(id, name, profile_photo, xp, role, department)')
           .eq('community_id', communityId)
           .order('joined_at', ascending: true);
-      return List<Map<String, dynamic>>.from(res as List);
+      return _normalizePersonRows(res, dateKey: 'joined_at');
     } catch (e) {
       debugPrint('[SupabaseDataService] getCommunityMembers failed: $e');
       return [];
     }
+  }
+
+  /// RPC (düz satır) ve PostgREST embed (`profiles: {...}`) çıktılarını tek
+  /// biçime getirir. `department` TEXT[] olduğundan metne çevrilir.
+  static List<Map<String, dynamic>> _normalizePersonRows(
+    dynamic res, {
+    required String dateKey,
+  }) {
+    if (res is! List) return [];
+    return res.map((raw) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final profile = row['profiles'] is Map
+          ? Map<String, dynamic>.from(row['profiles'] as Map)
+          : <String, dynamic>{
+              'id': row['user_id'],
+              'name': row['name'],
+              'email': row['email'],
+              'profile_photo': row['profile_photo'],
+              'xp': row['xp'],
+              'role': row['role'],
+              'department': row['department'],
+            };
+      final dept = profile['department'];
+      profile['department'] = dept is List
+          ? dept.whereType<String>().where((d) => d.isNotEmpty).join(', ')
+          : dept?.toString();
+      profile['id'] ??= row['user_id'];
+      return <String, dynamic>{
+        'user_id': row['user_id'] ?? profile['id'],
+        dateKey: row[dateKey],
+        'name': profile['name'],
+        'profiles': profile,
+      };
+    }).toList();
   }
 
   /// Başkanın yönettiği topluluk(lar)ı döndürür.
@@ -470,6 +340,24 @@ class SupabaseDataService {
     await _db.from('posts').delete().eq('id', postId);
   }
 
+  /// Kullanıcının sunucuda üye olduğu tüm topluluk id'lerini döndürür.
+  /// Çoklu cihaz tutarlılığı için yerel (SharedPreferences) listeyle
+  /// birlikte kullanılır — bkz. [JoinedCommunitiesService].
+  Future<Set<int>> getMyCommunityIds() async {
+    try {
+      final res = await _db
+          .from('community_members')
+          .select('community_id')
+          .eq('user_id', _uid);
+      return (res as List)
+          .map((e) => (e as Map)['community_id'] as int)
+          .toSet();
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getMyCommunityIds failed: $e');
+      return {};
+    }
+  }
+
   Future<bool> isMember(int communityId) async {
     try {
       final res = await _db
@@ -484,98 +372,69 @@ class SupabaseDataService {
     }
   }
 
+  /// Üyeliği sunucuda kaydeder. Asıl üyelik satırı yazılamazsa hatayı
+  /// yukarı fırlatır (çağıran taraf — bkz. [JoinedCommunitiesService] —
+  /// bunu yerel optimistic güncellemeyi geri almak için kullanır). Üye
+  /// sayacı RPC'si best-effort'tur, başarısız olsa da üyelik geçerlidir.
   Future<void> joinCommunity(int communityId) async {
-    try {
-      await _db.from('community_members').upsert({
-        'user_id': _uid,
-        'community_id': communityId,
-      });
-      await _db
-          .rpc(
-            'increment_community_member',
-            params: {'community_id': communityId},
-          )
-          .catchError((_) {});
-    } catch (_) {}
+    await _db.from('community_members').upsert({
+      'user_id': _uid,
+      'community_id': communityId,
+    });
+    await _db
+        .rpc(
+          'increment_community_member',
+          params: {'community_id': communityId},
+        )
+        .catchError((_) {});
   }
 
+  /// Üyeliği sunucudan kaldırır. Asıl silme işlemi başarısız olursa
+  /// hatayı yukarı fırlatır — bkz. [joinCommunity] açıklaması.
   Future<void> leaveCommunity(int communityId) async {
-    try {
-      await _db
-          .from('community_members')
-          .delete()
-          .eq('user_id', _uid)
-          .eq('community_id', communityId);
-      await _db
-          .rpc(
-            'decrement_community_member',
-            params: {'community_id': communityId},
-          )
-          .catchError((_) {});
-    } catch (_) {}
+    await _db
+        .from('community_members')
+        .delete()
+        .eq('user_id', _uid)
+        .eq('community_id', communityId);
+    await _db
+        .rpc(
+          'decrement_community_member',
+          params: {'community_id': communityId},
+        )
+        .catchError((_) {});
   }
 
   // ── Gönderiler ───────────────────────────────────────────────────────────────
 
+  // Not: hata BİLEREK yutulup sahte/demo gönderi listesi döndürülmüyor (bkz.
+  // kontrol.md Bölüm 14.9 / 16.3) — çağıran taraf yerel önbelleği gösterip
+  // arka planda bunu dener, başarısız olursa kendi hata durumunu yönetir.
+  /// [limit]'ten AZ sayıda sonuç dönmesi, çağıran tarafın sonraki sayfa
+  /// olmadığını anlaması için kullanılabilir (bkz. home_screen.dart sonsuz
+  /// kaydırma — kontrol.md Bölüm 16.13).
   Future<List<PostModel>> getGonderiler({int page = 1, int limit = 15}) async {
-    try {
-      final res = await _db
-          .from('posts')
-          .select()
-          .order('created_at', ascending: false)
-          .range((page - 1) * limit, page * limit - 1);
-      final list = (res as List)
-          .map((j) => PostModel.fromApiJson(j as Map<String, dynamic>))
-          .toList();
-      if (list.isNotEmpty) {
-        // Yalnızca ilk sayfa (varsayılan) önbelleğe alınır.
-        if (page == 1) unawaited(_cacheList(_keyPosts, res));
-        return list;
-      }
-    } catch (e) {
-      debugPrint('[SupabaseDataService] getGonderiler fallback triggered: $e');
-    }
-    return _demoGonderiler;
+    final res = await _db
+        .from('posts')
+        .select('*, communities(category)')
+        .order('created_at', ascending: false)
+        .range((page - 1) * limit, page * limit - 1);
+    final list = (res as List)
+        .map((j) => PostModel.fromApiJson(j as Map<String, dynamic>))
+        .toList();
+    // Yalnızca ilk sayfa (varsayılan) önbelleğe alınır.
+    if (list.isNotEmpty && page == 1) unawaited(_cacheList(_keyPosts, res));
+    return list;
   }
 
   /// Yerel önbellekteki gönderileri anında döndürür (ağ beklemez).
   List<PostModel> getCachedGonderiler() =>
       _readCache(_keyPosts).map(PostModel.fromApiJson).toList();
 
-  static final List<PostModel> _demoGonderiler = [
-    PostModel(
-      id: 1,
-      toplulukAdi: 'Girişimci Mühendisler Topluluğu',
-      toplulukLogo: 'assets/gem.png',
-      metin: 'Girişimcilik ve İnovasyon Zirvesi \'26 başvuruları başladı! SUBÜ ve SAÜ öğrencilerinin geliştirdiği projeler jüri karşısına çıkıyor.',
-      tarih: '3 saat önce',
-      destekPuani: 142,
-      kalitePuani: 4.9,
-    ),
-    PostModel(
-      id: 2,
-      toplulukAdi: 'Bilişim Sistemleri Mühendisliği Topluluğu',
-      toplulukLogo: 'assets/gem.png',
-      metin: 'Yapay Zeka & Derin Öğrenme Atölyesi bu Perşembe kampüs kütüphane seminer salonunda! Katılım ücretsizdir.',
-      tarih: '7 saat önce',
-      destekPuani: 98,
-      kalitePuani: 4.8,
-    ),
-    PostModel(
-      id: 3,
-      toplulukAdi: 'Tarih Öğrenci Topluluğu',
-      toplulukLogo: 'assets/gem.png',
-      metin: 'Hafta sonu Taraklı - Göynük Kültür Gezimiz gerçekleştirildi. Katılan tüm üyelerimize teşekkür ederiz!',
-      tarih: '1 gün önce',
-      destekPuani: 67,
-      kalitePuani: 4.7,
-    ),
-  ];
-
   Future<Map<String, dynamic>> getSupportStatus() async {
     try {
       final now = DateTime.now();
-      final week = _isoWeek(now);
+      final week = isoWeek(now);
       final year = now.year;
       final res = await _db
           .from('post_supports')
@@ -593,7 +452,7 @@ class SupabaseDataService {
   Future<Map<String, dynamic>> supportPost(int postId) async {
     try {
       final now = DateTime.now();
-      final week = _isoWeek(now);
+      final week = isoWeek(now);
       final year = now.year;
       await _db.from('post_supports').insert({
         'user_id': _uid,
@@ -618,14 +477,16 @@ class SupabaseDataService {
   }
 
   Future<void> unsupportPost(int postId) async {
-    try {
-      await _db
-          .from('post_supports')
-          .delete()
-          .eq('user_id', _uid)
-          .eq('post_id', postId);
-      await _db.rpc('decrement_post_support', params: {'post_id': postId});
-    } catch (_) {}
+    // Not: hata BİLEREK yutulmuyor — home_screen.dart._handleSupportTap()
+    // bu çağrıyı zaten try/catch ile sarıp başarısız olursa optimistic UI
+    // güncellemesini geri alıyor; hata burada yutulursa o rollback hiç
+    // tetiklenmiyordu (bkz. kontrol.md Bölüm 14.8).
+    await _db
+        .from('post_supports')
+        .delete()
+        .eq('user_id', _uid)
+        .eq('post_id', postId);
+    await _db.rpc('decrement_post_support', params: {'post_id': postId});
   }
 
   Future<PostModel> createPost({
@@ -685,14 +546,24 @@ class SupabaseDataService {
   }
 
   /// Etkinliğe katılan öğrencilerin listesi (Başkan Paneli için profil ve e-posta bilgileriyle)
+  /// Biçim ve e-posta kaynağı için bkz. [getCommunityMembers].
   Future<List<Map<String, dynamic>>> getEventParticipants(int postId) async {
+    try {
+      final res = await _db.rpc(
+        'get_event_participants_detailed',
+        params: {'p_post_id': postId},
+      );
+      return _normalizePersonRows(res, dateKey: 'created_at');
+    } catch (e) {
+      debugPrint('[SupabaseDataService] get_event_participants_detailed failed: $e');
+    }
     try {
       final res = await _db
           .from('event_participants')
-          .select('user_id, created_at, profiles(id, name, email, department, profile_photo, role)')
+          .select('user_id, created_at, profiles(id, name, department, profile_photo, role)')
           .eq('post_id', postId)
           .order('created_at', ascending: true);
-      return List<Map<String, dynamic>>.from(res as List);
+      return _normalizePersonRows(res, dateKey: 'created_at');
     } catch (e) {
       debugPrint('[SupabaseDataService] getEventParticipants failed: $e');
       return [];
@@ -812,18 +683,25 @@ class SupabaseDataService {
 
   /// Görsel yükler (MIME/boyut sınırı kontrollü). Öncelik Telegraph;
   /// Telegraph başarısız olursa Supabase Storage'a düşer (fallback).
+  ///
+  /// Yüklemeden önce EXIF meta verisi (özellikle GPS konumu) temizlenir —
+  /// Telegraph kalıcı/herkese açık bir üçüncü parti barındırma olduğundan
+  /// bu adım atlanmaz (bkz. güvenlik denetimi: "EXIF/GPS sızıntısı").
   Future<String> uploadPostImage(File file) async {
     final validation = await FileValidator.validateFile(file);
     if (!validation.isValid) {
       throw ArgumentError(validation.errorMessage);
     }
+
+    final sanitized = await ImageSanitizer.stripExifAndReencode(file);
+
     try {
-      final url = await _uploadPostImageToTelegraph(file);
+      final url = await _uploadPostImageToTelegraph(sanitized);
       if (url != null) return url;
     } catch (e) {
       debugPrint('[Upload] Telegraph failed, falling back to Supabase: $e');
     }
-    return _uploadPostImageToSupabase(file);
+    return _uploadPostImageToSupabase(sanitized);
   }
 
   /// Telegraph'a yükler (POST https://api.telegra.ph/upload, multipart "file").
@@ -867,34 +745,26 @@ class SupabaseDataService {
 
   // ── İndirimler ───────────────────────────────────────────────────────────────
 
+  // Not: hata BİLEREK yutulup sahte/demo kupon listesi döndürülmüyor (bkz.
+  // kontrol.md Bölüm 14.9 / 16.3) — çağıran taraf yerel önbelleği gösterip
+  // arka planda bunu dener, başarısız olursa kendi hata durumunu yönetir.
   Future<List<DiscountModel>> getKuponlar() async {
-    try {
-      final res =
-          await _db.from('discounts').select().order('id', ascending: false);
-      final list = (res as List)
-          .map((j) => DiscountModel.fromApiJson(j as Map<String, dynamic>))
-          .toList();
-
-      if (list.isNotEmpty) {
-        unawaited(_cacheList(_keyKuponlar, res));
-        return list;
-      }
-    } catch (e) {
-      debugPrint('[SupabaseDataService] getKuponlar fallback triggered: $e');
-    }
-    return _demoKuponlar;
+    final res =
+        await _db.from('discounts').select().order('id', ascending: false);
+    final list = (res as List)
+        .map((j) => DiscountModel.fromApiJson(j as Map<String, dynamic>))
+        .toList();
+    if (list.isNotEmpty) unawaited(_cacheList(_keyKuponlar, res));
+    return list;
   }
 
-  /// Konum tabanlı, atomic kupon hak etme işlemi (RPC claim_coupon)
+  /// Konum tabanlı, atomic kupon hak etme işlemi (RPC claim_coupon).
+  /// Mesafe/geofence kontrolü ve kod üretimi tamamen sunucuda (RPC içinde)
+  /// yapılır — istemci yalnızca ham konumu gönderir.
   Future<Map<String, dynamic>> claimCoupon({
     required int discountId,
     required double userLat,
     required double userLng,
-    double merchantLat = 40.7408,
-    double merchantLng = 30.3333,
-    double geofenceRadiusMeters = 50.0,
-    String categoryPrefix = 'AB',
-    String merchantChar = 'X',
   }) async {
     try {
       final response = await _db.rpc('claim_coupon', params: {
@@ -906,93 +776,34 @@ class SupabaseDataService {
       if (response != null && response is Map) {
         return Map<String, dynamic>.from(response);
       }
-    } catch (e) {
-      debugPrint('[SupabaseDataService] claimCoupon RPC fallback: $e');
-    }
-
-    // Fallback simülasyonu (Ağ/Çevrimdışı modu)
-    final distanceMeters = LocationService.distanceMeters(
-      userLat,
-      userLng,
-      merchantLat,
-      merchantLng,
-    );
-
-    if (distanceMeters > geofenceRadiusMeters) {
       return {
         'success': false,
-        'error': 'distance_too_far',
-        'distance_meters': distanceMeters,
-        'max_allowed_meters': geofenceRadiusMeters,
+        'error': 'unexpected_response',
+        'message': 'Sunucudan beklenmeyen bir yanıt geldi. Tekrar deneyin.',
+      };
+    } catch (e) {
+      // Not: burada BİLEREK sahte bir "başarı" simülasyonu üretilmiyor.
+      // Önceki sürüm, RPC çağrısı herhangi bir sebeple (ağ hatası, sunucu
+      // hatası) başarısız olduğunda istemci tarafında mesafeyi hesaplayıp
+      // kendi kupon kodunu üretiyordu — bu kod veritabanına hiç kaydedilmediği
+      // için işletme tarafından geçersiz sayılıyordu VE sahte GPS ile
+      // (mesafe kontrolü de istemci tarafında olduğundan) sınırsız kupon
+      // kodu üretilmesine izin veriyordu (bkz. kontrol.md Bölüm 10 notu).
+      // Kupon hakkı yalnızca sunucu tarafında (RPC) belirlenmeli.
+      debugPrint('[SupabaseDataService] claimCoupon RPC hatası: $e');
+      return {
+        'success': false,
+        'error': 'network_or_server_error',
         'message':
-            'İşletmeye yeterince yakın değilsiniz (${distanceMeters.toStringAsFixed(0)}m uzaktasınız). Kuponu açmak için 50m yakınına gelmelisiniz.',
+            'Kupon açılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.',
       };
     }
-
-    // [Prefix: 2 Harf][Random: 2 Hane][MerchantID: 1 Harf][Random: 2 Hane] (Örn: AB12X34)
-    final nowMs = DateTime.now().microsecondsSinceEpoch;
-    final num1 = 10 + (nowMs % 90);
-    final num2 = 10 + ((nowMs ~/ 7) % 90);
-    final fallbackCode =
-        '${categoryPrefix.toUpperCase()}$num1${merchantChar.toUpperCase()}$num2';
-
-    return {
-      'success': true,
-      'code': fallbackCode,
-      'already_claimed': false,
-      'claimed_at': DateTime.now().toIso8601String(),
-      'distance_meters': distanceMeters,
-      'message': 'Tebrikler! Kupon kodunuz başarıyla açıldı.',
-    };
   }
 
 
   /// Yerel önbellekteki kuponları anında döndürür (ağ beklemez).
   List<DiscountModel> getCachedKuponlar() =>
       _readCache(_keyKuponlar).map(DiscountModel.fromApiJson).toList();
-
-  static final List<DiscountModel> _demoKuponlar = [
-    DiscountModel(
-      id: 1,
-      sirketAd: 'English Time Dil Okulları',
-      kuponAdi: 'Kur Kayıtlarında %20 İndirim',
-      indirimOrani: '%20',
-      logoPath: 'assets/gem.png',
-      renk: 0xFF00ACC1,
-    ),
-    DiscountModel(
-      id: 2,
-      sirketAd: 'Pandora Güzellik Merkezi',
-      kuponAdi: 'Tüm Hizmetlerde %15 İndirim',
-      indirimOrani: '%15',
-      logoPath: 'assets/gem.png',
-      renk: 0xFF0F9D58,
-    ),
-    DiscountModel(
-      id: 3,
-      sirketAd: 'Reyhan Pastanesi',
-      kuponAdi: 'Tatlı ve Pastalarda %10 İndirim',
-      indirimOrani: '%10',
-      logoPath: 'assets/gem.png',
-      renk: 0xFF00ACC1,
-    ),
-    DiscountModel(
-      id: 4,
-      sirketAd: 'Eda Optik',
-      kuponAdi: 'Gözlük ve Güneş Gözlüğünde %25 İndirim',
-      indirimOrani: '%25',
-      logoPath: 'assets/gem.png',
-      renk: 0xFF0F9D58,
-    ),
-    DiscountModel(
-      id: 5,
-      sirketAd: 'Efsane Şahin Spor Kulübü',
-      kuponAdi: 'Aylık Üyelikte %20 İndirim',
-      indirimOrani: '%20',
-      logoPath: 'assets/gem.png',
-      renk: 0xFF00ACC1,
-    ),
-  ];
 
   // ── Kullanıcı profili ────────────────────────────────────────────────────────
 
@@ -1042,7 +853,7 @@ class SupabaseDataService {
       final adSoyad = p['name'] as String? ?? 'Ahmet Safa Zengin';
       final email = p['email'] as String? ?? '23010404022@subu.edu.tr';
       final birthDate = p['birth_date'] as String? ?? '15.05.2002';
-      final bolum = p['department'] as String? ?? 'Bilişim Sistemleri Mühendisliği';
+      final bolum = departmentText(p['department']) ?? 'Bilişim Sistemleri Mühendisliği';
       final qrString = "NEVGENC KİMLİĞİ\nAd Soyad: $adSoyad\nE-posta: $email\nDoğum Tarihi: $birthDate\nBölüm: $bolum";
 
       return UserProfileModel(
@@ -1083,9 +894,74 @@ class SupabaseDataService {
       if (grade != null) 'grade': grade,
     };
     if (updates.isEmpty) return;
-    try {
-      await _db.from('profiles').update(updates).eq('id', userId);
-    } catch (_) {}
+    // Not: hata BİLEREK yutulmuyor — çağıran taraf (profile_screen.dart)
+    // yerel state'i iyimser (optimistic) güncelliyor, bu yüzden sunucu
+    // yazması başarısız olursa kullanıcıya haber verip geri alabilmesi
+    // gerekiyor (bkz. kontrol.md Bölüm 14.8).
+    await _db.from('profiles').update(updates).eq('id', userId);
+  }
+
+  // ── Veri görüntüleme / dışa aktarma (KVKK/GDPR) ─────────────────────────────
+  // kontrol.md Bölüm 12.5: hesap silme sağlamdı ama kullanıcının kendi verisini
+  // uygulama içinden görüntüleme/dışa aktarma özelliği yoktu, yalnızca e-posta
+  // talep süreci vardı. Bu, kullanıcının SADECE kendi (auth.uid()) verisini
+  // toplar — RLS zaten başkasının verisine erişimi engelliyor.
+
+  /// Kullanıcının kendi gönderilerini döndürür (profil/veri dışa aktarma için).
+  Future<List<Map<String, dynamic>>> getMyPosts() async {
+    final res = await _db
+        .from('posts')
+        .select('id, content, created_at, support_count, community_name')
+        .eq('user_id', _uid)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res as List);
+  }
+
+  /// Kullanıcının profilini, gönderilerini, taleplerini ve rozetlerini tek bir
+  /// JSON'da toplar — "Verilerimi Görüntüle" ekranında gösterilir/kopyalanır.
+  Future<Map<String, dynamic>> exportMyData() async {
+    final uid = _uid;
+    final profile = await getUserProfile(uid);
+    final posts = await getMyPosts().catchError((_) => <Map<String, dynamic>>[]);
+    final tickets = await getMyTickets().catchError((_) => <UserTicket>[]);
+    final communityIds = await getMyCommunityIds().catchError((_) => <int>{});
+
+    return {
+      'exported_at': DateTime.now().toUtc().toIso8601String(),
+      'profile': profile == null
+          ? null
+          : {
+              'id': uid,
+              'name': profile.adSoyad,
+              'email': profile.email,
+              'department': profile.bolum,
+              'grade': profile.sinif,
+              'birth_date': profile.birthDate,
+              'badges': profile.rozetler.map((r) => r.rozetAd).toList(),
+            },
+      'joined_community_count': communityIds.length,
+      'posts': posts
+          .map(
+            (p) => {
+              'id': p['id'],
+              'content': p['content'],
+              'created_at': p['created_at'],
+              'support_count': p['support_count'],
+              'community_name': p['community_name'],
+            },
+          )
+          .toList(),
+      'tickets': tickets
+          .map(
+            (t) => {
+              'id': t.id,
+              'subject': t.subject,
+              'status': t.status,
+              'created_at': t.createdAt.toIso8601String(),
+            },
+          )
+          .toList(),
+    };
   }
 
   // ── Liderlik tablosu ─────────────────────────────────────────────────────────
@@ -1158,7 +1034,7 @@ class SupabaseDataService {
       'user_id': _uid,
       'token': token,
       'platform': platform,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     });
   }
 
@@ -1294,7 +1170,7 @@ class SupabaseDataService {
     }
     final updates = <String, dynamic>{
       'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (adminNotes != null) {
       updates['admin_notes'] = adminNotes.trim();
@@ -1460,7 +1336,12 @@ class SupabaseDataService {
                   .from('profiles')
                   .update({'xp': current + 10})
                   .eq('id', uid);
-            } catch (_) {}
+            } catch (e) {
+              // XP ödülü ikincil bir yan etki — birincil işlemi (destek/
+              // gönderi) engellememesi için yutuluyor, yalnızca gözlemlenebilir
+              // olsun diye logluyoruz.
+              debugPrint('XP fallback güncellemesi başarısız: $e');
+            }
           }),
     ]);
   }
@@ -1499,13 +1380,29 @@ class SupabaseDataService {
 
   /// 30 günden eski okunmuş bildirimleri temizler.
   Future<void> deleteOldReadNotifications(String userId) async {
-    final cutoff = DateTime.now().subtract(const Duration(days: 30)).toIso8601String();
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(days: 30)).toIso8601String();
     await _db
         .from('notifications')
         .delete()
         .eq('user_id', userId)
         .eq('is_read', true)
         .lt('created_at', cutoff);
+  }
+
+  /// Okunmamış bildirim sayısı (anasayfa/zil rozeti için — hafif count sorgusu).
+  Future<int> getUnreadNotificationCount(String userId) async {
+    try {
+      final res = await _db
+          .from('notifications')
+          .select()
+          .eq('user_id', userId)
+          .eq('is_read', false)
+          .count(CountOption.exact);
+      return res.count;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getUnreadNotificationCount failed: $e');
+      return 0;
+    }
   }
 
   /// Realtime bildirim aboneliği.
@@ -1538,8 +1435,8 @@ class SupabaseDataService {
       final q3 = _db.from('posts').select('support_count').eq('community_id', communityId);
       final q4 = _db.from('posts').select('quality_score').eq('community_id', communityId);
       final q5 = _db.from('events').select().eq('community_id', communityId).count(CountOption.exact);
-      final q6 = _db.from('posts').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String());
-      final q7 = _db.from('post_supports').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String());
+      final q6 = _db.from('posts').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().toUtc().subtract(const Duration(days: 30)).toIso8601String());
+      final q7 = _db.from('post_supports').select('user_id').eq('community_id', communityId).gte('created_at', DateTime.now().toUtc().subtract(const Duration(days: 30)).toIso8601String());
 
       final results = await Future.wait<dynamic>([q1, q2, q3, q4, q5, q6, q7]);
 
@@ -1586,7 +1483,7 @@ class SupabaseDataService {
   Future<List<Map<String, dynamic>>> getMemberGrowthTrend(int communityId) async {
     try {
       final now = DateTime.now();
-      final thirtyDaysAgo = now.subtract(const Duration(days: 30)).toIso8601String();
+      final thirtyDaysAgo = now.toUtc().subtract(const Duration(days: 30)).toIso8601String();
 
       final res = await _db
           .from('community_members')
@@ -1625,7 +1522,7 @@ class SupabaseDataService {
   Future<List<Map<String, dynamic>>> getPostActivityTrend(int communityId) async {
     try {
       final now = DateTime.now();
-      final sevenDaysAgo = now.subtract(const Duration(days: 7)).toIso8601String();
+      final sevenDaysAgo = now.toUtc().subtract(const Duration(days: 7)).toIso8601String();
 
       final res = await _db
           .from('posts')
@@ -1728,12 +1625,38 @@ class SupabaseDataService {
   }
 
   /// Admin: Tüm kullanıcılara yeni sürüm / güncelleme bildirimi gönderir.
+  /// Önce `send-community-notification` (audience=all) denenir: uygulama içi
+  /// kayıt + gerçek FCM push. Fonksiyon deploy edilmemişse (404) yalnızca
+  /// uygulama içi kayıt doğrudan eklenir.
   Future<void> sendUpdateAnnouncement({
     required String title,
     required String message,
     String? version,
     String? storeUrl,
   }) async {
+    try {
+      await _db.functions.invoke(
+        'send-community-notification',
+        body: {
+          'audience': 'all',
+          'title': title,
+          'body': message,
+          'data': {
+            'version': version,
+            'store_url': storeUrl,
+            'is_update': true,
+          },
+        },
+      );
+      return;
+    } on FunctionException catch (e) {
+      if (e.status != 404) {
+        final details = e.details;
+        final msg = details is Map ? details['error'] as String? : null;
+        throw Exception(msg ?? 'Duyuru gönderilemedi (HTTP ${e.status}).');
+      }
+      debugPrint('[SupabaseDataService] send-community-notification yok, doğrudan kayda düşülüyor.');
+    }
     try {
       final profiles = await _db.from('profiles').select('id');
       final userIds = (profiles as List).map((p) => p['id'] as String).toList();
@@ -1750,7 +1673,7 @@ class SupabaseDataService {
             'is_update': true,
           },
           'is_read': false,
-          'created_at': DateTime.now().toIso8601String(),
+          'created_at': DateTime.now().toUtc().toIso8601String(),
         }).toList();
 
         await _db.from('notifications').insert(rows);
@@ -1758,6 +1681,205 @@ class SupabaseDataService {
     } catch (e) {
       debugPrint('[SupabaseDataService] sendUpdateAnnouncement hatası: $e');
       rethrow;
+    }
+  }
+
+  // ── Haberler (Anasayfa Bülteni) ─────────────────────────────────────────────
+  // RLS: herkes okuyabilir, sadece admin yazabilir (bkz. migration).
+
+  Future<List<NewsModel>> getNews({int limit = 20}) async {
+    try {
+      final res = await _db
+          .from('news_bulletins')
+          .select()
+          .order('published_at', ascending: false)
+          .limit(limit);
+      final list = (res as List)
+          .map((j) => NewsModel.fromApiJson(j as Map<String, dynamic>))
+          .toList();
+      unawaited(_cacheList(_keyNews, res));
+      return list;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getNews failed: $e');
+      return [];
+    }
+  }
+
+  List<NewsModel> getCachedNews() =>
+      _readCache(_keyNews).map(NewsModel.fromApiJson).toList();
+
+  /// Admin: yeni haber ekler. Sunucu tarafı yetki kontrolü RLS ile yapılır.
+  Future<void> createNews({
+    required String title,
+    required String summary,
+    required String content,
+    String? imageUrl,
+    DateTime? publishedAt,
+  }) async {
+    await _db.from('news_bulletins').insert({
+      'title': title,
+      'summary': summary,
+      'content': content,
+      if (imageUrl != null && imageUrl.isNotEmpty) 'image_url': imageUrl,
+      'published_at': (publishedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      'created_by': _uid,
+    });
+  }
+
+  Future<void> updateNews(
+    int id, {
+    required String title,
+    required String summary,
+    required String content,
+    String? imageUrl,
+  }) async {
+    await _db.from('news_bulletins').update({
+      'title': title,
+      'summary': summary,
+      'content': content,
+      'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteNews(int id) async {
+    await _db.from('news_bulletins').delete().eq('id', id);
+  }
+
+  // ── İş İlanları (Nev Plus) ──────────────────────────────────────────────────
+  // RLS: herkes okuyabilir, sadece admin yazabilir (bkz. migration).
+
+  Future<List<JobListingModel>> getJobListings({int limit = 50}) async {
+    try {
+      final res = await _db
+          .from('job_listings')
+          .select()
+          .order('published_at', ascending: false)
+          .limit(limit);
+      final list = (res as List)
+          .map((j) => JobListingModel.fromApiJson(j as Map<String, dynamic>))
+          .toList();
+      unawaited(_cacheList(_keyJobListings, res));
+      return list;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getJobListings failed: $e');
+      return [];
+    }
+  }
+
+  List<JobListingModel> getCachedJobListings() =>
+      _readCache(_keyJobListings).map(JobListingModel.fromApiJson).toList();
+
+  /// Admin: yeni iş ilanı ekler. Sunucu tarafı yetki kontrolü RLS ile yapılır.
+  Future<void> createJobListing({
+    required String title,
+    required String description,
+    DateTime? publishedAt,
+  }) async {
+    await _db.from('job_listings').insert({
+      'title': title,
+      'description': description,
+      'published_at': (publishedAt ?? DateTime.now()).toUtc().toIso8601String(),
+      'created_by': _uid,
+    });
+  }
+
+  Future<void> updateJobListing(
+    int id, {
+    required String title,
+    required String description,
+  }) async {
+    await _db.from('job_listings').update({
+      'title': title,
+      'description': description,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteJobListing(int id) async {
+    await _db.from('job_listings').delete().eq('id', id);
+  }
+
+  // ── Menüde Ne Var? (Nev Plus) ───────────────────────────────────────────────
+  // İş ilanlarıyla aynı yapı (title/description) ve aynı RLS: herkes okur,
+  // yalnızca admin yazar. Model olarak JobListingModel yeniden kullanılır.
+
+  Future<List<JobListingModel>> getMenuItems({int limit = 50}) async {
+    try {
+      final res = await _db
+          .from('menu_items')
+          .select()
+          .order('published_at', ascending: false)
+          .limit(limit);
+      final list = (res as List)
+          .map((j) => JobListingModel.fromApiJson(j as Map<String, dynamic>))
+          .toList();
+      unawaited(_cacheList(_keyMenuItems, res));
+      return list;
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getMenuItems failed: $e');
+      return [];
+    }
+  }
+
+  List<JobListingModel> getCachedMenuItems() =>
+      _readCache(_keyMenuItems).map(JobListingModel.fromApiJson).toList();
+
+  Future<void> createMenuItem({
+    required String title,
+    required String description,
+  }) async {
+    await _db.from('menu_items').insert({
+      'title': title,
+      'description': description,
+      'published_at': DateTime.now().toUtc().toIso8601String(),
+      'created_by': _uid,
+    });
+  }
+
+  Future<void> updateMenuItem(
+    int id, {
+    required String title,
+    required String description,
+  }) async {
+    await _db.from('menu_items').update({
+      'title': title,
+      'description': description,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteMenuItem(int id) async {
+    await _db.from('menu_items').delete().eq('id', id);
+  }
+
+  // ── Başkan: Üyelere Bildirim Gönderme ───────────────────────────────────────
+  // Edge Function üzerinden gönderilir: yetki (rol + kendi topluluğu) sunucu
+  // tarafında (Deno) tekrar doğrulanır — istemci kontrolü tek başına güvenilmez.
+
+  /// Başkanın kendi topluluğundaki üyelere bildirim gönderir.
+  /// [recipientIds] boşsa topluluğun tüm üyelerine gönderilir.
+  Future<Map<String, dynamic>> sendCommunityNotification({
+    required int communityId,
+    required String title,
+    required String body,
+    List<String>? recipientIds,
+  }) async {
+    try {
+      final res = await _db.functions.invoke(
+        'send-community-notification',
+        body: {
+          'community_id': communityId,
+          'title': title,
+          'body': body,
+          if (recipientIds != null) 'recipient_ids': recipientIds,
+        },
+      );
+      return Map<String, dynamic>.from(res.data as Map);
+    } on FunctionException catch (e) {
+      // invoke() 2xx dışı yanıtlarda FunctionException fırlatır (FunctionResponse
+      // asla hata durumunu taşımaz) — sunucunun döndürdüğü okunabilir mesajı
+      // (details.error) çıkarıp kullanıcıya onu gösteriyoruz.
+      final details = e.details;
+      final message = details is Map ? details['error'] as String? : null;
+      throw Exception(message ?? 'Bildirim gönderilemedi (HTTP ${e.status}).');
     }
   }
 }

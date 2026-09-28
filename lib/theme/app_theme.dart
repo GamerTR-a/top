@@ -161,9 +161,45 @@ class AppTheme {
 
 final ValueNotifier<AppTheme> themeNotifier = ValueNotifier<AppTheme>(AppTheme.starry);
 
+/// `true` iken tema, işletim sisteminin karanlık/aydınlık tercihini takip
+/// eder (bkz. kontrol.md Bölüm 20.7 — önceden yalnızca elle seçim vardı).
+bool _followSystemBrightness = false;
+bool get isFollowingSystemBrightness => _followSystemBrightness;
+
+AppTheme _themeForPlatformBrightness() {
+  final brightness =
+      WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  return brightness == Brightness.dark ? AppTheme.starry : AppTheme.light;
+}
+
+class _SystemBrightnessWatcher extends WidgetsBindingObserver {
+  @override
+  void didChangePlatformBrightness() {
+    if (_followSystemBrightness) {
+      themeNotifier.value = _themeForPlatformBrightness();
+    }
+  }
+}
+
+final _systemBrightnessWatcher = _SystemBrightnessWatcher();
+bool _watcherRegistered = false;
+
 Future<void> loadSavedTheme() async {
   final prefs = await SharedPreferences.getInstance();
   final typeName = prefs.getString('theme_type') ?? 'starry';
+
+  if (!_watcherRegistered) {
+    WidgetsBinding.instance.addObserver(_systemBrightnessWatcher);
+    _watcherRegistered = true;
+  }
+
+  if (typeName == 'system') {
+    _followSystemBrightness = true;
+    themeNotifier.value = _themeForPlatformBrightness();
+    return;
+  }
+  _followSystemBrightness = false;
+
   switch (typeName) {
     case 'starry':
       themeNotifier.value = AppTheme.starry;
@@ -182,7 +218,16 @@ Future<void> loadSavedTheme() async {
   }
 }
 
+/// Kullanıcı Ayarlar'dan "Sistemi Kullan"ı seçtiğinde çağrılır.
+Future<void> useSystemTheme() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('theme_type', 'system');
+  _followSystemBrightness = true;
+  themeNotifier.value = _themeForPlatformBrightness();
+}
+
 Future<void> saveCurrentTheme(AppTheme theme) async {
+  _followSystemBrightness = false;
   final prefs = await SharedPreferences.getInstance();
   await prefs.setString('theme_type', theme.type.name);
   if (theme.type == ThemeType.custom) {

@@ -59,6 +59,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Geri',
         ),
         title: Text(
           'Taleplerim ve Şikayetlerim',
@@ -68,6 +69,7 @@ class _TicketListScreenState extends State<TicketListScreen> {
           IconButton(
             icon: Icon(Icons.refresh, color: theme.primary),
             onPressed: _loadTickets,
+            tooltip: 'Yenile',
           ),
         ],
       ),

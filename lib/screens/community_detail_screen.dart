@@ -41,7 +41,9 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
     if (_membershipLoading) return;
     setState(() => _membershipLoading = true);
     try {
-      // Liste kartındaki "Katıl" ile aynı yerel mantık: anında ve çevrimdışı çalışır.
+      // Yerel liste anında güncellenir, ardından sunucudaki
+      // community_members tablosuna da yazılır (başkan panelinin üye
+      // listesi ve bildirim özelliği bu veriye dayanır).
       final joined =
           await JoinedCommunitiesService.instance.toggle(widget.topluluk);
       if (mounted) {
@@ -54,6 +56,21 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                   : '${widget.topluluk.ad} topluluğundan ayrıldın.',
             ),
             backgroundColor: joined ? theme.primary : theme.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'İşlem sunucuya kaydedilemedi. Lütfen tekrar dene.',
+            ),
+            backgroundColor: theme.error,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -89,6 +106,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
                 onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Geri',
               ),
               title: Text(
                 t.ad,

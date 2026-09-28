@@ -59,7 +59,20 @@ class _PostCardState extends State<PostCard> {
       } else {
         await api.leaveEvent(widget.post.id);
       }
-    } catch (_) {}
+    } catch (_) {
+      // Sunucu isteği başarısız oldu — istemci tarafı iyimser (optimistic)
+      // güncellemeyi geri al ve kullanıcıyı bilgilendir. Aksi halde UI
+      // sunucuyla kalıcı olarak senkron dışı kalabiliyordu (bkz. kontrol.md
+      // Bölüm 14.4).
+      if (!mounted) return;
+      setState(() {
+        _isEventJoined = !nextState;
+        _eventCount += nextState ? -1 : 1;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('İşlem başarısız oldu, tekrar deneyin.')),
+      );
+    }
   }
 
 
@@ -517,6 +530,7 @@ class _PostCardState extends State<PostCard> {
                       color: theme.warning,
                       size: 36,
                     ),
+                    tooltip: '$starIndex yıldız',
                     onPressed: () {
                       setState(() {
                         _myRating = starIndex;

@@ -58,6 +58,8 @@ class _ThemeCustomizerScreenState extends State<ThemeCustomizerScreen> {
                             _buildSectionLabel('Hazır Temalar', theme),
                             const SizedBox(height: 16),
                             _buildPresetRow(theme),
+                            const SizedBox(height: 16),
+                            _buildSystemToggle(theme),
                             const SizedBox(height: 24),
                           ],
                         ),
@@ -87,6 +89,7 @@ class _ThemeCustomizerScreenState extends State<ThemeCustomizerScreen> {
           IconButton(
             icon: Icon(Icons.arrow_back_ios, color: theme.primary),
             onPressed: _cancel,
+            tooltip: 'Geri',
           ),
           Expanded(
             child: Text(
@@ -139,8 +142,42 @@ class _ThemeCustomizerScreenState extends State<ThemeCustomizerScreen> {
     );
   }
 
+  Widget _buildSystemToggle(AppTheme theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.surface.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.primary.withValues(alpha: 0.2)),
+      ),
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(
+          'Sistemi Kullan',
+          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          'Cihazının karanlık/aydınlık moduna göre otomatik değişir',
+          style: TextStyle(color: theme.textMuted, fontSize: 12),
+        ),
+        value: isFollowingSystemBrightness,
+        activeThumbColor: theme.primary,
+        onChanged: (value) {
+          if (value) {
+            _applied = true;
+            useSystemTheme();
+            Navigator.pop(context);
+          } else {
+            setState(() {});
+          }
+        },
+      ),
+    );
+  }
+
   Widget _buildPresetCard(AppTheme preset, String iconSymbol, AppTheme currentTheme) {
-    final isActive = currentTheme.type == preset.type;
+    final isActive =
+        !isFollowingSystemBrightness && currentTheme.type == preset.type;
     return GestureDetector(
       onTap: () => _applyPreset(preset),
       child: AnimatedContainer(

@@ -74,6 +74,7 @@ class _CommunityAnalyticsScreenState extends State<CommunityAnalyticsScreen>
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
                 onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Geri',
               ),
               title: Text('Analitik', style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold, fontSize: 17)),
               actions: [

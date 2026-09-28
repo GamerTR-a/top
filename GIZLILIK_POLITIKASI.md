@@ -22,7 +22,8 @@ Uygulamayı kullanırken sunduğumuz hizmetlerin niteliğine bağlı olarak aşa
 - **Profil ve İçerik Görselleri:** Profil fotoğrafı belirleme, topluluk logosu yükleme veya gönderilerinize görsel ekleme işlevleri için cihazınızın kamerası (`CAMERA`) veya fotoğraf seçicisi (Android Photo Picker) aracılığıyla yalnızca sizin seçtiğiniz görsellere erişilir. Uygulamamız galeri veya cihaz depolamanızdaki diğer kişisel dosyalarınıza erişmez.
 
 ### d) Bildirim ve Cihaz Verileri
-- **Anlık Bildirimler (Push Notifications):** Duyurular, etkinlik hatırlatmaları, topluluk mesajları ve sistem bilgilendirmelerini iletebilmek amacıyla cihazınıza özel Firebase Cloud Messaging (FCM) token bilgisi ve `POST_NOTIFICATIONS` izni işlenir.
+- **Anlık Bildirimler (Push Notifications):** Duyurular, etkinlik hatırlatmaları, topluluk mesajları ve sistem bilgilendirmelerini iletebilmek amacıyla cihazınıza özel Firebase Cloud Messaging (FCM) token bilgisi ve `POST_NOTIFICATIONS` izni işlenir. Bu bildirimleri Ayarlar > "Bildirim ve Gizlilik Tercihleri" ekranından istediğiniz zaman kapatabilirsiniz.
+- **Çökme Raporları ve Performans Verileri:** Uygulama beklenmedik şekilde kapanırsa hatanın nedenini bulup düzeltebilmemiz için Firebase Crashlytics aracılığıyla anonim teknik hata raporu (hatanın oluştuğu kod satırı, cihaz modeli, işletim sistemi sürümü) gönderilir; ayrıca uygulamayı hızlandırabilmemiz için Firebase Performance Monitoring aracılığıyla açılış süresi ve ağ isteği süreleri gibi anonim performans verileri toplanır. Bu veriler isim, e-posta gibi kişisel veri İÇERMEZ ve Ayarlar > "Bildirim ve Gizlilik Tercihleri" ekranından tek bir anahtarla kapatılabilir.
 
 ### e) Kullanıcı Tarafından Oluşturulan İçerikler ve Etkileşimler
 - Oluşturduğunuz gönderiler, yorumlar, topluluk sohbet mesajları, katıldığınız etkinlikler, beğeni/destek kayıtları ve kişisel takvim görevleriniz.
@@ -49,7 +50,7 @@ Kişisel verileriniz aşağıdaki amaçlarla sınırlı ve ölçülü olarak iş
 Verileriniz hiçbir koşulda üçüncü taraflara satılmaz veya ticari/reklam amaçlarıyla paylaşılmaz. Hizmetlerin yürütülmesi için yalnızca aşağıdaki güvenilir altyapı sağlayıcıları ile veri işlenmektedir:
 
 - **Supabase Inc.:** Veritabanı barındırma, kullanıcı kimlik doğrulama (Auth) ve medya depolama (Storage) hizmetleri. Verileriniz Supabase'in yüksek güvenlikli bulut altyapısında Satır Düzeyi Güvenlik (RLS - Row Level Security) protokolleri ile korunmaktadır.
-- **Google Firebase (Google LLC):** Cihazınıza anlık bildirim (push notification) iletebilmek için FCM altyapısı kullanılır.
+- **Google Firebase (Google LLC):** Cihazınıza anlık bildirim (push notification) iletebilmek için FCM altyapısı, uygulama çökmelerini tespit edip düzeltebilmek için Crashlytics, ve uygulama performansını izleyebilmek için Performance Monitoring kullanılır (hepsi Ayarlar'dan kapatılabilir).
 - **OpenStreetMap / Mapbox:** Kampüs haritası karo görsellerinin sunulması için harita servis sağlayıcıları.
 
 ---
@@ -57,6 +58,13 @@ Verileriniz hiçbir koşulda üçüncü taraflara satılmaz veya ticari/reklam a
 ## 4. Veri Güvenliği ve Saklama Süresi
 
 Kişisel verileriniz, hesabınız aktif olduğu sürece saklanır. Verilerinizin yetkisiz erişim, kayıp veya kötüye kullanıma karşı korunması için endüstri standardı şifreleme yöntemleri (SSL/TLS), Satır Düzeyi Güvenlik (RLS) kuralları ve güvenli kimlik doğrulama protokolleri uygulanmaktadır.
+
+Bazı geçici içerikler, sunucularımızda otomatik olarak ve daha kısa sürelerde silinir:
+- Gönderiler: 30 gün,
+- Genel duyuru bildirimleri: 1 gün,
+- Destek talepleri/şikayetler (çözümlendikten sonra): 7 gün,
+- İş ilanları: 14 gün,
+- Haber bültenleri: 7 gün.
 
 ---
 
@@ -80,6 +88,8 @@ Kullanıcılarımızın kendi verileri üzerinde tam kontrol hakkı vardır. Hes
 - Eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme,
 - Kanun uyarınca verilerinizin silinmesini veya yok edilmesini talep etme,
 - İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle aleyhinize bir sonucun ortaya çıkmasına itiraz etme.
+
+**Verilerinizi görüntüleme/kopya alma hakkını uygulama içinden kendiniz kullanabilirsiniz:** Profil / Ayarlar → **Verilerim** ekranından profil bilgilerinizi, gönderilerinizi ve taleplerinizi görüntüleyebilir, tamamını JSON formatında panoya kopyalayabilirsiniz.
 
 ---
 

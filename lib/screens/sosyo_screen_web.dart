@@ -44,6 +44,7 @@ class _SosyoScreenState extends State<SosyoScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Geri',
         ),
       ),
       body: const HtmlElementView(viewType: _viewType),

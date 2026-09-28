@@ -39,7 +39,9 @@ class _AnimatedThemeBackgroundState extends State<AnimatedThemeBackground>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3600), // continuous long running time tick
-    )..repeat();
+    );
+    // Sistem "Hareketi Azalt" tercihi didChangeDependencies'te uygulanır
+    // (MediaQuery burada henüz hazır değil) — bkz. kontrol.md Bölüm 21.8.
 
     final rng = Random(42);
 
@@ -117,6 +119,20 @@ class _AnimatedThemeBackgroundState extends State<AnimatedThemeBackground>
         colorIndex: i % 3,
       ),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Kullanıcı sistem ayarlarından "Hareketi Azalt"ı açıp kapatırsa bu
+    // metod tekrar çağrılır (MediaQuery değişikliği) — sürekli dönen dekoratif
+    // animasyon durur/yeniden başlar, arka plan yine de statik olarak görünür.
+    // (.stop()/.repeat() zaten aynı durumdaysa no-op'tur, ekstra kontrole gerek yok.)
+    if (MediaQuery.of(context).disableAnimations) {
+      _controller.stop();
+    } else {
+      _controller.repeat();
+    }
   }
 
   @override

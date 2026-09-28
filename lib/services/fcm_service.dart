@@ -1,14 +1,19 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'notification_service.dart';
+import '../screens/notification_center_screen.dart';
+import '../utils/navigation_service.dart';
+import 'local_notification_service.dart';
+import 'supabase_auth_service.dart';
 
 /// Push bildirimleri için ana anahtar.
-/// v1'de Firebase (google-services.json / GoogleService-Info.plist / APNs)
-/// henüz yapılandırılmadığı için kapalıdır. Yapılandırma tamamlanınca `true`
-/// yapılması yeterlidir.
-const bool kPushEnabled = false;
+/// Firebase yapılandırma dosyaları (google-services.json / GoogleService-Info.plist)
+/// eklendi ve Gradle/Xcode proje dosyalarına bağlandı. iOS tarafında APNs
+/// anahtarı Firebase Console'a yüklenmeden gerçek cihazda iOS push çalışmaz
+/// (Android bundan etkilenmez) — bkz. görev 1 kurulum notları.
+const bool kPushEnabled = true;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -57,10 +62,19 @@ class FcmService {
         );
       }
 
+      // iOS ön planda banner'ı sistem gösterir; Android'de _onForegroundMessage
+      // yerel bildirimle gösterir (ikisi birden olursa bildirim iki kez düşer).
+      await messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-      FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpened);
+      FirebaseMessaging.onMessageOpenedApp.listen(_navigateForMessage);
 
-      debugPrint('[FCM] Başlatıldı. Token: $_token');
+      // Güvenlik: push token'ın tamamı loglanmaz (ele geçirilirse sahte push
+      // gönderimine izin verebilir) — yalnızca alınıp alınmadığı loglanır.
+      debugPrint('[FCM] Başlatıldı. Token alındı: ${_token != null}');
     } catch (e) {
       // Firebase yapılandırılmamışsa uygulama çalışmaya devam eder, push bildirimler devre dışı kalır.
       // Push bildirimleri etkinleştirmek için: Firebase Console'dan google-services.json (Android)
@@ -87,7 +101,7 @@ class FcmService {
         'user_id': user.id,
         'token': _token!,
         'platform': platform,
-        'updated_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
       });
       debugPrint('[FCM] Token Supabase\'e kaydedildi.');
     } catch (e) {
@@ -101,16 +115,48 @@ class FcmService {
   }
 
   void _onForegroundMessage(RemoteMessage message) {
-    final title = message.notification?.title ?? '';
-    final body = message.notification?.body ?? '';
-    if (title.isNotEmpty) {
-      notificationService.add(title: title, body: body);
-    }
-    debugPrint('[FCM] Ön plan bildirimi: $title');
+    // Sunucudan gelen tüm push'lar aynı anda `notifications` tablosuna da
+    // yazılır (bkz. sendUpdateAnnouncement / send-community-notification);
+    // burada yalnızca sistem bildirimi olarak gösterilir.
+    debugPrint('[FCM] Ön plan bildirimi: ${message.notification?.title}');
+    final n = message.notification;
+    if (n == null || defaultTargetPlatform != TargetPlatform.android) return;
+    localNotificationService.showNow(
+      title: n.title ?? 'NevGenç',
+      body: n.body ?? '',
+    );
   }
 
-  void _onMessageOpened(RemoteMessage message) {
+  /// Uygulama tamamen kapalıyken bir bildirime tıklanarak açıldıysa (cold
+  /// start), bu durumu yakalayıp aynı yönlendirmeyi tetikler. `AuthGate`
+  /// içinde, Navigator hazır olduktan (ilk frame) sonra çağrılmalı — bkz.
+  /// kontrol.md Bölüm 25.4 (önceden bu senaryo hiç ele alınmıyordu).
+  Future<void> checkInitialMessage() async {
+    if (!kPushEnabled) return;
+    try {
+      final message = await FirebaseMessaging.instance.getInitialMessage();
+      if (message != null) _navigateForMessage(message);
+    } catch (e) {
+      debugPrint('[FCM] getInitialMessage kontrolü başarısız: $e');
+    }
+  }
+
+  /// Bildirime tıklanınca (uygulama arka planda veya soğuk başlatmada)
+  /// Bildirimler ekranına yönlendirir — bildirim türüne göre ayrıca ilgili
+  /// içerik ekranına gitmek istenirse `message.data` burada okunabilir.
+  void _navigateForMessage(RemoteMessage message) async {
     debugPrint('[FCM] Bildirime tıklandı: ${message.notification?.title}');
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+    final user = await SupabaseAuthService.getCurrentUser().catchError(
+      (_) => null,
+    );
+    if (user == null) return;
+    nav.push(
+      MaterialPageRoute(
+        builder: (_) => NotificationCenterScreen(currentUser: user),
+      ),
+    );
   }
 }
 

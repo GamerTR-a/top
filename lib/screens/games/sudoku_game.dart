@@ -300,6 +300,7 @@ class _SudokuGameState extends State<SudokuGame> {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.textColor),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Sudoku',

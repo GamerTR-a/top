@@ -29,7 +29,8 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
   }
 
   Future<void> _pickAndSaveImage(ImageSource source) async {
-    if (_storage == null) return;
+    final storage = _storage;
+    if (storage == null) return;
 
     setState(() => _loading = true);
     try {
@@ -63,7 +64,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
       final savedFile = await File(picked.path).copy('${photosDir.path}/$fileName');
 
       // Update album
-      final success = await _storage.addPhotoToAlbum(_album.id, savedFile.path);
+      final success = await storage.addPhotoToAlbum(_album.id, savedFile.path);
       if (success) {
         _album = _album.addPhoto(savedFile.path);
         if (mounted) setState(() {});
@@ -171,6 +172,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
               child: IconButton(
                 onPressed: () => Navigator.pop(ctx),
                 icon: Icon(Icons.close, color: Colors.white, size: 28),
+                tooltip: 'Kapat',
                 style: IconButton.styleFrom(
                   backgroundColor: Colors.black.withValues(alpha: 0.5),
                   padding: const EdgeInsets.all(12),
@@ -188,6 +190,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
                       Navigator.pop(ctx);
                       _showImageFullscreen(_album.photoPaths[index - 1], index - 1);
                     },
+                    tooltip: 'Önceki Fotoğraf',
                     icon: Icon(Icons.chevron_left, color: Colors.white, size: 40),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black.withValues(alpha: 0.5),
@@ -207,6 +210,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
                       Navigator.pop(ctx);
                       _showImageFullscreen(_album.photoPaths[index + 1], index + 1);
                     },
+                    tooltip: 'Sonraki Fotoğraf',
                     icon: Icon(Icons.chevron_right, color: Colors.white, size: 40),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.black.withValues(alpha: 0.5),
@@ -233,6 +237,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context, true),
+          tooltip: 'Geri',
         ),
         title: Text(
           _album.name,
@@ -427,7 +432,8 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
   }
 
   Future<void> _clearAlbum() async {
-    if (_storage == null) return;
+    final storage = _storage;
+    if (storage == null) return;
 
     final theme = themeNotifier.value;
     final confirmed = await showDialog<bool>(
@@ -457,7 +463,7 @@ class _MemoryAlbumDetailScreenState extends State<MemoryAlbumDetailScreen> {
       }
       // Clear album in storage
       _album = _album.copyWith(photoPaths: [], coverPhotoPath: null, updatedAt: DateTime.now());
-      await _storage.saveMemoryAlbums((await _storage.getMemoryAlbums()).map((a) => a.id == _album.id ? _album : a).toList());
+      await storage.saveMemoryAlbums((await storage.getMemoryAlbums()).map((a) => a.id == _album.id ? _album : a).toList());
       if (mounted) setState(() {});
       _showSnack('Albüm temizlendi', isError: false);
     } catch (e) {

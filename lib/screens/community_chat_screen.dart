@@ -68,9 +68,25 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     });
   }
 
+  // Sadece bilinen Telegram/Discord host'larına açmaya izin ver — keyfi
+  // şema/URL (intent://, javascript: vb.) enjeksiyonunu engeller.
+  static const Set<String> _allowedLinkHosts = {
+    't.me',
+    'telegram.me',
+    'telegram.org',
+    'discord.gg',
+    'discord.com',
+    'discordapp.com',
+  };
+
   Future<void> _openLink(String url) async {
     final uri = Uri.tryParse(url);
-    if (uri == null) return;
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        !_allowedLinkHosts.contains(uri.host.toLowerCase())) {
+      if (mounted) _showSnack('Geçersiz veya desteklenmeyen bağlantı.', isError: true);
+      return;
+    }
     try {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok && mounted) _showSnack('Bağlantı açılamadı.', isError: true);
@@ -276,6 +292,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
                 onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Geri',
               ),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

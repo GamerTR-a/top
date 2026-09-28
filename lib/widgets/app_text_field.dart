@@ -13,6 +13,7 @@ class AppTextField extends StatelessWidget {
   final bool obscure;
   final TextInputType? keyboardType;
   final Widget? suffix;
+  final Iterable<String>? autofillHints;
 
   const AppTextField({
     super.key,
@@ -23,6 +24,7 @@ class AppTextField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.suffix,
+    this.autofillHints,
   });
 
   OutlineInputBorder _border(Color color, [double width = 1]) =>
@@ -37,6 +39,8 @@ class AppTextField extends StatelessWidget {
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
+      // Şifre yöneticilerinin doğru çalışması için (bkz. kontrol.md Bölüm 23.2).
+      autofillHints: autofillHints,
       style: TextStyle(color: theme.textColor),
       decoration: InputDecoration(
         hintText: hint,

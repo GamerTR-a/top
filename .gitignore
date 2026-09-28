@@ -67,6 +67,13 @@ backend/*.db-wal
 # Imza sertifikalari / anahtarlar — asla commit etme
 upload_certificate.pem
 *.p8
+*.p12
+*.mobileprovision
+
+# Firebase yapılandırma dosyaları — cihaz/proje bazlı, secret olmasa da
+# yanlışlıkla commit edilmemeli (CI bunları secret'lardan üretir)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
 
 
 # Windows kisa yollari
@@ -80,3 +87,7 @@ website copy/
 
 # Topluluk uye bilgileri (ad/telefon/e-posta) — kisileri veri, commit etme
 /data
+
+# Windows klasör meta verisi / Gradle derleme çıktısı
+desktop.ini
+/android/build/

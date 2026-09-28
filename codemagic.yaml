@@ -15,7 +15,29 @@ workflows:
           flutter pub get
       - name: Build iOS IPA
         script: |
-          flutter build ipa --release --build-name=1.0.25 --build-number=26
+          # Sürüm numarası pubspec.yaml'dan otomatik okunur (--build-name/--build-number
+          # BİLEREK verilmiyor — sabit değer App Store Connect'e eski/duplicate build
+          # numarasıyla yükleme denemesine ve reddedilmeye yol açıyordu).
+          flutter build ipa --release --obfuscate --split-debug-info=build/debug-info
+      - name: Crashlytics dSYM sembollerini yükle
+        script: |
+          # Xcode'da bir "Run Script" build phase'i olmadığından (bkz. kontrol.md
+          # Bölüm 17.2) iOS native çökmeleri sembolize etmek için CocoaPods'un
+          # kurduğu upload-symbols aracını build sonrası elle çalıştırıyoruz.
+          # ios/Runner/GoogleService-Info.plist Codemagic'te "Encrypted files"
+          # olarak tanımlı olmalı (repo'da commit edilmiyor, bkz. .gitignore).
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          GSP="ios/Runner/GoogleService-Info.plist"
+          DSYMS_DIR="build/ios/archive/Runner.xcarchive/dSYMs"
+          if [ ! -f "$UPLOAD_SYMBOLS" ]; then
+            echo "::warning::upload-symbols bulunamadı ($UPLOAD_SYMBOLS) — dSYM yüklemesi atlandı."
+          elif [ ! -f "$GSP" ]; then
+            echo "::warning::GoogleService-Info.plist bulunamadı — dSYM yüklemesi atlandı. Codemagic > Encrypted files'a ekleyin."
+          elif [ ! -d "$DSYMS_DIR" ]; then
+            echo "::warning::dSYM klasörü bulunamadı ($DSYMS_DIR) — dSYM yüklemesi atlandı."
+          else
+            "$UPLOAD_SYMBOLS" -gsp "$GSP" -p ios "$DSYMS_DIR"
+          fi
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log

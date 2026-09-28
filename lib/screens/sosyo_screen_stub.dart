@@ -27,6 +27,7 @@ class SosyoScreen extends StatelessWidget {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios, color: theme.primary),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
           ),
           body: AnimatedThemeBackground(

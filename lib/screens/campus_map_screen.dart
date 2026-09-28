@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/campus_poi.dart';
+import '../utils/turkish_text.dart';
 import '../services/campus_poi_data.dart';
 import '../services/location_service.dart';
 import '../theme/app_theme.dart';
@@ -28,7 +29,8 @@ class CampusMapScreen extends StatefulWidget {
   State<CampusMapScreen> createState() => _CampusMapScreenState();
 }
 
-class _CampusMapScreenState extends State<CampusMapScreen> {
+class _CampusMapScreenState extends State<CampusMapScreen>
+    with WidgetsBindingObserver {
   _GateStatus _status = _GateStatus.loading;
   Position? _position;
   String? _adminArea;
@@ -46,6 +48,7 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadPois();
     _initLocation();
     _searchCtrl.addListener(() => setState(() {}));
@@ -53,9 +56,56 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchCtrl.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Kullanıcı izni Ayarlar'dan değiştirip uygulamaya geri dönmüş olabilir —
+    // yalnızca izin sorunlu bir durumdaysak (ret/kalıcı ret) yeniden kontrol
+    // ediyoruz, zaten hazırsa (ready) gereksiz yeniden sorgu yapmıyoruz
+    // (bkz. kontrol.md Bölüm 15.8 / 28.4).
+    if (state == AppLifecycleState.resumed &&
+        (_status == _GateStatus.permissionDenied ||
+            _status == _GateStatus.deniedForever)) {
+      _initLocation();
+    }
+  }
+
+  Future<void> _showLocationRationale() async {
+    final theme = themeNotifier.value;
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.location_on_rounded, color: theme.primary),
+            const SizedBox(width: 10),
+            Text('Konum İzni', style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(
+          'Kampüs haritasında bulunduğun konumu gösterebilmek ve kıble yönünü '
+          'hesaplayabilmek için konumuna ihtiyacımız var. Konumun yalnızca '
+          'cihazında işlenir, sunucuya gönderilmez.',
+          style: TextStyle(color: theme.textMuted),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: ElevatedButton.styleFrom(backgroundColor: theme.primary, foregroundColor: Colors.white),
+            child: const Text('Anladım'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadPois() async {
@@ -69,6 +119,16 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
 
   Future<void> _initLocation() async {
     setState(() => _status = _GateStatus.loading);
+
+    // Apple/Google rehberlerine uygun: sistem izin penceresi açılmadan önce
+    // konumun ne için istendiğini açıklayan bir rationale diyaloğu göster
+    // (yalnızca izin henüz hiç sorulmamışsa/daha önce reddedilmişse).
+    final currentPermission = await Geolocator.checkPermission();
+    if (mounted &&
+        (currentPermission == LocationPermission.denied)) {
+      await _showLocationRationale();
+    }
+
     final permission = await LocationService.requestLocationPermission();
     if (!mounted) return;
     if (permission == LocationPermission.denied) {
@@ -126,11 +186,11 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
   }
 
   List<CampusPoi> get _visiblePois {
-    final q = _searchCtrl.text.trim().toLowerCase();
+    final q = turkishToLower(_searchCtrl.text.trim());
     return _allPois.where((p) {
       if (!_categoryMatches(p)) return false;
       if (q.isNotEmpty) {
-        final hay = '${p.name} ${p.description} ${p.address}'.toLowerCase();
+        final hay = turkishToLower('${p.name} ${p.description} ${p.address}');
         if (!hay.contains(q)) return false;
       }
       return true;
@@ -173,6 +233,7 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
               icon: Icon(Icons.arrow_back_ios_new_rounded,
                   color: theme.textColor),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Kampüs Cepte 🗺️',
@@ -601,7 +662,7 @@ class _CampusMapScreenState extends State<CampusMapScreen> {
             );
           }
         },
-        onTap: (_, _) => setState(() => _selected = null),
+        onTap: (tapPosition, point) => setState(() => _selected = null),
       ),
       children: [
         TileLayer(

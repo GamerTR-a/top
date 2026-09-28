@@ -43,7 +43,7 @@ jobs:
 
       - name: IPA ve Archive Derle (imzasiz)
         run: |
-          flutter build ios --release --config-only
+          flutter build ios --release --config-only --obfuscate --split-debug-info=build/debug-info
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -58,6 +58,25 @@ jobs:
           mkdir Payload
           cp -r Runner.app Payload/
           zip -r ../../../../ipa/NevGenc.ipa Payload
+
+      - name: Crashlytics dSYM sembollerini yukle
+        run: |
+          # bkz. kontrol.md Bolum 17.2 — Xcode'da Crashlytics "Run Script" build
+          # phase'i olmadigindan dSYM'leri elle yukluyoruz (codemagic.yaml ile
+          # ayni desen). Bu build imzasiz/yayinlanmadigi icin GoogleService-Info.plist
+          # secret'i burada tanimli degilse adim guvenle atlanir.
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          GSP="ios/Runner/GoogleService-Info.plist"
+          DSYMS_DIR="build/ios/archive/Runner.xcarchive/dSYMs"
+          if [ ! -f "$UPLOAD_SYMBOLS" ]; then
+            echo "::warning::upload-symbols bulunamadi ($UPLOAD_SYMBOLS) — dSYM yuklemesi atlandi."
+          elif [ ! -f "$GSP" ]; then
+            echo "::warning::GoogleService-Info.plist bulunamadi — dSYM yuklemesi atlandi."
+          elif [ ! -d "$DSYMS_DIR" ]; then
+            echo "::warning::dSYM klasoru bulunamadi ($DSYMS_DIR) — dSYM yuklemesi atlandi."
+          else
+            "$UPLOAD_SYMBOLS" -gsp "$GSP" -p ios "$DSYMS_DIR"
+          fi
 
       - name: IPA dosyasini artifact olarak yukle
         uses: actions/upload-artifact@v4

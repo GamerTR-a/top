@@ -111,7 +111,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                       title: '1. Cihaz İçi Yerel Depolama (Local Storage)',
                       icon: Icons.sd_card_rounded,
                       content:
-                          'NevGenç uygulaması, kullanıcı deneyiminizi ve çevrimdışı (offline) çalışma hızınızı artırmak amacıyla uygulama verilerini cihazınızın güvenli yerel depolama alanında (SharedPreferences / Cache) saklar. Yerel depolanan veriler cihazınız dışına izin verilmeksizin aktarılmaz.',
+                          'NevGenç uygulaması, kullanıcı deneyiminizi ve çevrimdışı (offline) çalışma hızınızı artırmak amacıyla bazı uygulama verilerini cihazınızın yerel depolama alanında (SharedPreferences / Cache) saklar. Oturum bilgileriniz ise cihazınızın şifreli anahtarlığında (iOS Keychain / Android Keystore) korunur. Yerel depolanan veriler cihazınız dışına izniniz olmaksızın aktarılmaz.',
                     ),
                     const SizedBox(height: 16),
 
@@ -121,7 +121,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                       title: '2. İzinler ve Veri Gizliliği',
                       icon: Icons.lock_outline_rounded,
                       content:
-                          'Uygulamamız yalnızca uygulamanın temel işlevleri için gerekli olan ağ erişim (INTERNET) ve bildirim (POST_NOTIFICATIONS) izinlerini talep eder. Konum, rehber veya dosya sisteminiz üzerinde gereksiz erişim izinleri istenmez ve hassas kişisel verileriniz üçüncü taraflarla paylaşılmaz.',
+                          'Uygulamamız temel işlevleri için ağ erişimi (INTERNET) ve bildirim (POST_NOTIFICATIONS) izinlerinin yanı sıra; profil/gönderi görseli seçebilmeniz için kamera ve galeri, kampüs haritası ve yakınımdaki etkinlikler gibi özellikler için ise konum (GPS) iznini talep eder. Bu izinler yalnızca ilgili özelliği kullandığınızda etkindir, istediğiniz zaman cihaz ayarlarından geri alabilirsiniz ve hassas kişisel verileriniz üçüncü taraflarla paylaşılmaz.',
                     ),
                     const SizedBox(height: 16),
 

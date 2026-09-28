@@ -6,6 +6,8 @@ import 'admin_screen.dart';
 import 'baskan_panel_screen.dart';
 import 'campus_map_screen.dart';
 import 'games/game_room_screen.dart';
+import 'job_listings_screen.dart';
+import 'nev_firsatlar_screen.dart';
 import 'sosyo_screen.dart';
 
 
@@ -175,6 +177,21 @@ class NevPlusScreen extends StatelessWidget {
                   _buildMenuItem(
                     context,
                     theme,
+                    'Nev Fırsatlar',
+                    Icons.local_fire_department_rounded,
+                    const Color(0xFFFF6E40),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NevFirsatlarScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  _buildMenuItem(
+                    context,
+                    theme,
                     'Kitap Okuma Kulübü',
                     Icons.menu_book,
                     const Color(0xFFFFD700),
@@ -183,26 +200,35 @@ class NevPlusScreen extends StatelessWidget {
                   _buildMenuItem(
                     context,
                     theme,
-                    'Topluluk Haberleri',
-                    Icons.newspaper,
-                    const Color(0xFF9D4EDD),
-                    onTap: () => _showComingSoon(context, 'Topluluk Haberleri', theme),
-                  ),
-                  _buildMenuItem(
-                    context,
-                    theme,
                     'Menüde Ne Var?',
                     Icons.restaurant_menu,
                     const Color(0xFFFF7043),
-                    onTap: () => _showComingSoon(context, 'Menüde Ne Var?', theme),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => JobListingsScreen(
+                            user: user,
+                            kind: InfoBoardKind.menu,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   _buildMenuItem(
                     context,
                     theme,
-                    'İş ilanları',
+                    'İş İlanları',
                     Icons.work_outline,
                     const Color(0xFF42A5F5),
-                    onTap: () => _showComingSoon(context, 'İş ilanları', theme),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => JobListingsScreen(user: user),
+                        ),
+                      );
+                    },
                   ),
                   _buildMenuItem(
                     context,

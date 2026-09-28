@@ -44,6 +44,7 @@ class GameRoomScreen extends StatelessWidget {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.textColor),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Oyun Odası 🎮',

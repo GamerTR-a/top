@@ -75,6 +75,7 @@ class _TicketCreateScreenState extends State<TicketCreateScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Geri',
         ),
         title: Text(
           'Yeni Talep / Şikayet',

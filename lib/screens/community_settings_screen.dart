@@ -67,7 +67,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
   Future<void> _pickLogo() async {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512, imageQuality: 80);
-    if (xfile != null) {
+    if (xfile != null && mounted) {
       setState(() => _pickedLogo = File(xfile.path));
     }
   }
@@ -177,6 +177,7 @@ class _CommunitySettingsScreenState extends State<CommunitySettingsScreen> {
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
                 onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Geri',
               ),
               title: Text(
                 'Topluluk Ayarları',

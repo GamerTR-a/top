@@ -16,8 +16,29 @@ class LocalStorageService {
     if (_instance == null) {
       _instance = LocalStorageService._();
       _prefs = await SharedPreferences.getInstance();
+      await _instance!._runMigrationsIfNeeded();
     }
     return _instance!;
+  }
+
+  // ── Şema sürümü / migration ──────────────────────────────────────────────
+  // Anahtar adlarındaki "_v1" son eki daha önce yalnızca isimlendirme kuralıydı
+  // — biçim değiştiğinde eski veriyi yeni biçime çeviren gerçek bir kod yoktu,
+  // bu yüzden `getCachedJsonList` gibi okuyucular sessizce boş listeye
+  // düşerdi (bkz. kontrol.md Bölüm 24.1 / 30.7). Bu alan gelecekteki gerçek
+  // bir şema değişikliğinde YAPILACAK dönüştürmeler için ayrılmış yer
+  // tutucudur — şu an her anahtar zaten ilk (v1) biçiminde olduğundan
+  // çalıştırılacak bir dönüştürme adımı yok, yalnızca sürüm damgalanıyor.
+  static const String _keySchemaVersion = 'local_storage_schema_version';
+  static const int _currentSchemaVersion = 1;
+
+  Future<void> _runMigrationsIfNeeded() async {
+    final stored = _prefs?.getInt(_keySchemaVersion) ?? 0;
+    if (stored >= _currentSchemaVersion) return;
+    // Gelecekte bir anahtar biçimi değiştiğinde buraya
+    // `if (stored < N) { ...eski veriyi oku, dönüştür, yeni anahtara yaz... }`
+    // adımları eklenmeli — böylece kullanıcı verisi sessizce kaybolmaz.
+    await _prefs?.setInt(_keySchemaVersion, _currentSchemaVersion);
   }
 
   /// Senkron erişim — `main()` içinde `getInstance()` çağrıldıktan sonra
@@ -30,12 +51,16 @@ class LocalStorageService {
   static const String _keyCachedPosts = 'offline_cached_posts';
   static const String _keyCachedAuthUser = 'cached_auth_user';
   static const String _keyNotificationSettings = 'notification_settings';
+  static const String _keyCrashReportingEnabled = 'crash_reporting_enabled';
   static const String _keyLastSyncTimestamp = 'last_sync_timestamp';
 
   // Liste önbelleği anahtarları — SupabaseDataService ile paylaşılır.
   static const String keyCachedKuponlar = 'offline_cached_kuponlar_v1';
   static const String keyCachedEtkinlikler = 'offline_cached_etkinlikler_v1';
   static const String keyCachedTopluluklar = 'offline_cached_topluluklar_v1';
+  static const String keyCachedNews = 'offline_cached_news_v1';
+  static const String keyCachedJobListings = 'offline_cached_job_listings_v1';
+  static const String keyCachedMenuItems = 'offline_cached_menu_items_v1';
 
   // --- Hatıra Galerisi (Memory Gallery) ---
   static const String _keyMemoryAlbums = 'memory_albums_v1';
@@ -52,7 +77,14 @@ class LocalStorageService {
   Future<bool> setThemeMode(String mode) async => setString(_keyThemeMode, mode);
 
   bool get notificationsEnabled => _prefs?.getBool(_keyNotificationSettings) ?? true;
-  Future<bool> setNotificationsEnabled(bool enabled) async => _prefs?.setBool(_keyNotificationSettings,enabled) ?? false;
+  Future<bool> setNotificationsEnabled(bool enabled) async => await _prefs?.setBool(_keyNotificationSettings, enabled) ?? false;
+
+  /// Kullanıcının Crashlytics çökme raporu gönderimine izin verip vermediği.
+  /// Varsayılan `true` (mevcut davranışla uyumlu) — kullanıcı Ayarlar'dan
+  /// kapatabilir (bkz. kontrol.md Bölüm 12.6).
+  bool get crashReportingEnabled => _prefs?.getBool(_keyCrashReportingEnabled) ?? true;
+  Future<bool> setCrashReportingEnabled(bool enabled) async =>
+      await _prefs?.setBool(_keyCrashReportingEnabled, enabled) ?? false;
 
   // --- General String/JSON Storage ---
   Future<bool> setString(String key, String value) async {
@@ -166,6 +198,30 @@ class LocalStorageService {
 
   Future<bool> clearAllCache() async {
     return await _prefs?.clear() ?? false;
+  }
+
+  /// Logout'ta çağrılır — paylaşılan bir cihazda bir sonraki kullanıcının
+  /// önceki kullanıcının önbelleğe alınmış SUNUCU içeriğini (gönderiler,
+  /// kuponlar, etkinlikler, topluluklar, haberler, iş ilanları, profil)
+  /// görmesini engeller.
+  ///
+  /// [clearAllCache] (`_prefs.clear()`) BİLEREK kullanılmıyor — o, tema
+  /// tercihi, gizlilik politikası onayı ve Hatıra Galerisi (tamamen yerel,
+  /// cihaza özel kişisel içerik) gibi kullanıcıdan/oturumdan BAĞIMSIZ
+  /// cihaz ayarlarını da silerdi (bkz. kontrol.md Bölüm 2.8).
+  Future<void> clearUserSessionCache({String? userId}) async {
+    await removeKey(_keyCachedPosts);
+    await removeKey(keyCachedKuponlar);
+    await removeKey(keyCachedEtkinlikler);
+    await removeKey(keyCachedTopluluklar);
+    await removeKey(keyCachedNews);
+    await removeKey(keyCachedJobListings);
+    await removeKey(keyCachedMenuItems);
+    await removeKey(_keyCachedAuthUser);
+    await removeKey(_keyLastSyncTimestamp);
+    if (userId != null && userId.isNotEmpty) {
+      await removeKey(_profileKey(userId));
+    }
   }
 
   // ── Hatıra Galerisi (Memory Gallery) ─────────────────────────────────────

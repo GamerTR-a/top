@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/local_notification_service.dart';
 import '../widgets/category_button.dart';
 import '../widgets/animated_theme_background.dart';
 import '../theme/app_theme.dart';
@@ -10,7 +11,7 @@ class TaskItem {
   final String id;
   final String title;
   final String description;
-  final String time;
+  final DateTime reminderAt;
   final IconData icon;
   final Color accentColor;
   bool isCompleted;
@@ -19,11 +20,27 @@ class TaskItem {
     required this.id,
     required this.title,
     required this.description,
-    required this.time,
+    required this.reminderAt,
     required this.icon,
     required this.accentColor,
     this.isCompleted = false,
   });
+
+  /// Bu görevin hatırlatıcı bildirimi için kararlı bildirim ID'si.
+  int get notificationId => LocalNotificationService.idFromString(id);
+
+  static const List<String> _months = [
+    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+  ];
+
+  /// Kart üzerinde gösterilen tarih + saat etiketi (örn. "12 Eki, 14:30").
+  String get timeLabel {
+    final d = reminderAt;
+    final h = d.hour.toString().padLeft(2, '0');
+    final m = d.minute.toString().padLeft(2, '0');
+    return '${d.day} ${_months[d.month - 1]}, $h:$m';
+  }
 
   /// Task ikonları — ağaç sallama (icon tree-shaking) release derlemeyi kırdığı
   /// için `IconData(...)` çalışma anında ÜRETİLMEZ; bilinen 4 ikon const bir
@@ -63,22 +80,33 @@ class TaskItem {
         'id': id,
         'title': title,
         'description': description,
-        'time': time,
+        'reminderAt': reminderAt.toIso8601String(),
         'isCompleted': isCompleted,
         'iconKey': _keyForIcon(icon),
         'icon': icon.codePoint, // eski sürümler için geriye dönük uyumluluk
         'color': accentColor.toARGB32(),
       };
 
-  factory TaskItem.fromJson(Map<String, dynamic> json) => TaskItem(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        description: json['description'] as String? ?? '',
-        time: json['time'] as String? ?? '12:00',
-        icon: _iconFromJson(json),
-        accentColor: Color(json['color'] as int? ?? 0xFF00ACC1),
-        isCompleted: json['isCompleted'] as bool? ?? false,
-      );
+  factory TaskItem.fromJson(Map<String, dynamic> json) {
+    DateTime reminderAt;
+    final rawReminder = json['reminderAt'] as String?;
+    if (rawReminder != null) {
+      reminderAt = DateTime.tryParse(rawReminder) ?? DateTime.now();
+    } else {
+      // v1 şemasından (yalnızca serbest metin 'time') geçiş — tarih hiç
+      // saklanmamıştı, bugüne varsayılan bir saat atanır.
+      reminderAt = DateTime.now();
+    }
+    return TaskItem(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      reminderAt: reminderAt,
+      icon: _iconFromJson(json),
+      accentColor: Color(json['color'] as int? ?? 0xFF00ACC1),
+      isCompleted: json['isCompleted'] as bool? ?? false,
+    );
+  }
 }
 
 class CalendarScreen extends StatefulWidget {
@@ -108,12 +136,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   bool _isCollapsed = false;
 
-  final List<TaskItem> _tasks = [
+  static DateTime _tomorrowAt(int hour, int minute) {
+    final now = DateTime.now();
+    final tomorrow = now.add(const Duration(days: 1));
+    return DateTime(tomorrow.year, tomorrow.month, tomorrow.day, hour, minute);
+  }
+
+  late final List<TaskItem> _tasks = [
     TaskItem(
       id: '1',
       title: 'Yazılım Projesi Teslimi',
       description: 'Bilişim Sistemleri Mühendisliği 3. Sınıf proje raporu teslim edilecek.',
-      time: '14:00',
+      reminderAt: _tomorrowAt(14, 0),
       icon: Icons.assignment_rounded,
       accentColor: const Color(0xFF00ACC1),
     ),
@@ -121,7 +155,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       id: '2',
       title: 'Kütüphane Kitap İadesi',
       description: 'Merkez Kütüphane 7/24 salonuna ödünç kitap teslimi yapılacak.',
-      time: '16:30',
+      reminderAt: _tomorrowAt(16, 30),
       icon: Icons.menu_book_rounded,
       accentColor: const Color(0xFFFFD700),
     ),
@@ -129,7 +163,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       id: '3',
       title: 'Topluluk Buluşması',
       description: 'Yazılım ve Bilişim Topluluğu yönetim ekibi haftalık toplantısı.',
-      time: '19:00',
+      reminderAt: _tomorrowAt(19, 0),
       icon: Icons.groups_rounded,
       accentColor: const Color(0xFF9D4EDD),
     ),
@@ -194,6 +228,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _focusedDay = _focusedDay.subtract(const Duration(days: 7));
               });
             },
+            tooltip: 'Önceki Hafta',
             icon: Icon(
               Icons.chevron_left_rounded,
               color: theme.textColor,
@@ -291,6 +326,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 _focusedDay = _focusedDay.add(const Duration(days: 7));
               });
             },
+            tooltip: 'Sonraki Hafta',
             icon: Icon(
               Icons.chevron_right_rounded,
               color: theme.textColor,
@@ -459,16 +495,29 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           ),
                           const SizedBox(width: 3),
                           Text(
-                            task.time,
+                            task.timeLabel,
                             style: TextStyle(
                               color: theme.textMuted,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () => _showAddTaskDialog(context, theme, existing: task),
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: 16,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                          ),
                           InkWell(
                             onTap: () {
+                              localNotificationService.cancel(task.notificationId);
                               setState(() {
                                 _tasks.removeWhere((t) => t.id == task.id);
                               });
@@ -640,7 +689,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    task.time,
+                    task.timeLabel,
                     style: TextStyle(
                       color: theme.textMuted,
                       fontSize: 13,
@@ -657,6 +706,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     setState(() {
                       task.isCompleted = !task.isCompleted;
                     });
+                    if (task.isCompleted) {
+                      localNotificationService.cancel(task.notificationId);
+                    } else {
+                      localNotificationService.scheduleAt(
+                        id: task.notificationId,
+                        title: task.title,
+                        body: task.description,
+                        dateTime: task.reminderAt,
+                      );
+                    }
                     _persistTasks();
                     Navigator.pop(ctx);
                     final themeNow = themeNotifier.value;
@@ -707,94 +766,190 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  void _showAddTaskDialog(BuildContext context, AppTheme theme) {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final timeCtrl = TextEditingController(text: '12:00');
+  /// Yeni hatırlatıcı ekler veya [existing] verilirse düzenler.
+  /// Tarih ve saat seçimi zorunludur; geçmiş bir zaman seçilemez. Kaydedilen
+  /// hatırlatıcı, seçilen tarih/saatte tetiklenecek şekilde
+  /// [localNotificationService] ile zamanlanır (uygulama kapalıyken de çalışır).
+  void _showAddTaskDialog(BuildContext context, AppTheme theme, {TaskItem? existing}) {
+    final titleCtrl = TextEditingController(text: existing?.title ?? '');
+    final descCtrl = TextEditingController(text: existing?.description ?? '');
+    DateTime? pickedDate = existing != null
+        ? DateTime(existing.reminderAt.year, existing.reminderAt.month, existing.reminderAt.day)
+        : null;
+    TimeOfDay? pickedTime = existing != null
+        ? TimeOfDay(hour: existing.reminderAt.hour, minute: existing.reminderAt.minute)
+        : null;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: theme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Yeni Görev / Hatırlatıcı ⏰',
-          style: TextStyle(
-            color: theme.textColor,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: titleCtrl,
-              style: TextStyle(color: theme.textColor),
-              decoration: InputDecoration(
-                labelText: 'Görev Başlığı',
-                labelStyle: TextStyle(color: theme.textMuted),
-                border: const OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          void pickError(String msg) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(msg), backgroundColor: theme.error),
+            );
+          }
+
+          return AlertDialog(
+            backgroundColor: theme.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Text(
+              existing == null ? 'Yeni Görev / Hatırlatıcı ⏰' : 'Hatırlatıcıyı Düzenle ⏰',
+              style: TextStyle(
+                color: theme.textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descCtrl,
-              style: TextStyle(color: theme.textColor),
-              decoration: InputDecoration(
-                labelText: 'Açıklama veya Detay',
-                labelStyle: TextStyle(color: theme.textMuted),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: timeCtrl,
-              style: TextStyle(color: theme.textColor),
-              decoration: InputDecoration(
-                labelText: 'Saat (örn: 14:30)',
-                labelStyle: TextStyle(color: theme.textMuted),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('İptal', style: TextStyle(color: theme.textMuted)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (titleCtrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _tasks.insert(
-                    0,
-                    TaskItem(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      title: titleCtrl.text.trim(),
-                      description: descCtrl.text.trim().isEmpty
-                          ? 'Detay belirtilmedi.'
-                          : descCtrl.text.trim(),
-                      time: timeCtrl.text.trim().isEmpty
-                          ? '12:00'
-                          : timeCtrl.text.trim(),
-                      icon: Icons.event_note_rounded,
-                      accentColor: theme.primary,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    style: TextStyle(color: theme.textColor),
+                    decoration: InputDecoration(
+                      labelText: 'Görev Başlığı *',
+                      labelStyle: TextStyle(color: theme.textMuted),
+                      border: const OutlineInputBorder(),
                     ),
-                  );
-                });
-                _persistTasks();
-                Navigator.pop(ctx);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primary,
-              foregroundColor: Colors.white,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    style: TextStyle(color: theme.textColor),
+                    decoration: InputDecoration(
+                      labelText: 'Açıklama veya Detay',
+                      labelStyle: TextStyle(color: theme.textMuted),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final res = await showDatePicker(
+                              context: ctx,
+                              initialDate: pickedDate ?? now,
+                              firstDate: now,
+                              lastDate: now.add(const Duration(days: 730)),
+                            );
+                            if (res != null) setDialogState(() => pickedDate = res);
+                          },
+                          icon: Icon(Icons.calendar_today_rounded, size: 15, color: theme.primary),
+                          label: Text(
+                            pickedDate == null
+                                ? 'Tarih *'
+                                : '${pickedDate!.day}.${pickedDate!.month}.${pickedDate!.year}',
+                            style: TextStyle(color: theme.textColor, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: theme.primary.withValues(alpha: 0.4)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final res = await showTimePicker(
+                              context: ctx,
+                              initialTime: pickedTime ?? TimeOfDay.now(),
+                            );
+                            if (res != null) setDialogState(() => pickedTime = res);
+                          },
+                          icon: Icon(Icons.access_time_rounded, size: 15, color: theme.primary),
+                          label: Text(
+                            pickedTime == null ? 'Saat *' : pickedTime!.format(ctx),
+                            style: TextStyle(color: theme.textColor, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: theme.primary.withValues(alpha: 0.4)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            child: const Text('Ekle'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('İptal', style: TextStyle(color: theme.textMuted)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final title = titleCtrl.text.trim();
+                  if (title.isEmpty) {
+                    pickError('Görev başlığı zorunludur.');
+                    return;
+                  }
+                  if (pickedDate == null || pickedTime == null) {
+                    pickError('Tarih ve saat seçimi zorunludur.');
+                    return;
+                  }
+                  final combined = DateTime(
+                    pickedDate!.year,
+                    pickedDate!.month,
+                    pickedDate!.day,
+                    pickedTime!.hour,
+                    pickedTime!.minute,
+                  );
+                  if (combined.isBefore(DateTime.now())) {
+                    pickError('Geçmiş bir tarih/saat seçemezsiniz.');
+                    return;
+                  }
+
+                  final task = TaskItem(
+                    id: existing?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    title: title,
+                    description: descCtrl.text.trim().isEmpty
+                        ? 'Detay belirtilmedi.'
+                        : descCtrl.text.trim(),
+                    reminderAt: combined,
+                    icon: existing?.icon ?? Icons.event_note_rounded,
+                    accentColor: existing?.accentColor ?? theme.primary,
+                    isCompleted: existing?.isCompleted ?? false,
+                  );
+
+                  setState(() {
+                    if (existing != null) {
+                      final idx = _tasks.indexWhere((t) => t.id == existing.id);
+                      if (idx != -1) {
+                        _tasks[idx] = task;
+                      } else {
+                        _tasks.insert(0, task);
+                      }
+                    } else {
+                      _tasks.insert(0, task);
+                    }
+                  });
+                  _persistTasks();
+                  localNotificationService.scheduleAt(
+                    id: task.notificationId,
+                    title: task.title,
+                    body: task.description,
+                    dateTime: task.reminderAt,
+                  );
+                  Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(existing == null ? 'Ekle' : 'Kaydet'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

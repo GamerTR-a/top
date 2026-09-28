@@ -1,6 +1,20 @@
 import 'package:supabase_flutter/supabase_flutter.dart'
     show User; // ignore: depend_on_referenced_packages
 
+/// `profiles.department` bir TEXT[] kolonu; PostgREST onu List olarak döndürür.
+/// Uygulama içinde virgülle ayrılmış String olarak taşınır.
+String? departmentText(Object? raw) {
+  if (raw == null) return null;
+  if (raw is List) {
+    final joined = raw
+        .map((e) => e?.toString().trim() ?? '')
+        .where((e) => e.isNotEmpty)
+        .join(', ');
+    return joined.isEmpty ? null : joined;
+  }
+  return raw.toString();
+}
+
 class AuthUser {
   final String id;
   final String name;
@@ -41,7 +55,7 @@ class AuthUser {
     Map<String, dynamic> profile,
   ) {
     final role = profile['role'] as String? ?? 'student';
-    final rawDept = profile['department'] as String?;
+    final rawDept = departmentText(profile['department']);
     return AuthUser(
       id: supabaseUser.id,
       name:
@@ -75,7 +89,7 @@ class AuthUser {
         name: json['name'] as String? ?? '',
         email: json['email'] as String? ?? '',
         birthDate: json['birthDate'] as String?,
-        department: json['department'] as String?,
+        department: departmentText(json['department']),
         isAdmin: json['isAdmin'] as bool? ?? false,
         isBaskan: json['isBaskan'] as bool? ?? false,
         role: json['role'] as String? ?? 'student',

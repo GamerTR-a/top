@@ -124,7 +124,8 @@ Bu doküman, **NevGenç** Android uygulamasının 1. sürümden itibaren (v1.0.0
 Yükleme sonrasında sarı renkli uyarılar çıkabilir:
 
 - **Kod gösterme dosyası (mapping.txt / deobfuscation)**: Supabase/Dio kütüphanelerinin çökmesini önlemek için R8 karartması kapalı tutulmaktadır. Bu nedenle haritalama dosyası gerekmez.
-- **Yerel hata ayıklama sembolleri (Native symbols)**: Flutter C++ motoru için opsiyonel geliştirici analiz dosyasıdır.
+- **Yerel hata ayıklama sembolleri (Native symbols)**: Google Play Console'da çıkan *"Bu App Bundle yerel kod içeriyor ve hata ayıklama sembolleri yüklemediniz"* uyarısı. 
+  > 📌 **Sonraki Sürüm Planı:** Bu uyarıyı tamamen kaldırmak için `android/app/build.gradle.kts` dosyasındaki `ndk { debugSymbolLevel = "NONE" }` satırı `debugSymbolLevel = "SYMBOL_TABLE"` (veya `"FULL"`) olarak güncellenecektir.
 
 *(Her iki uyarı da bilgilendirme amaçlıdır, yayına veya incelemeye engel değildir.)*
 

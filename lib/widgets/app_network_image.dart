@@ -42,7 +42,7 @@ class AppNetworkImage extends StatelessWidget {
           File(path),
           fit: fit,
           cacheWidth: cacheWidth,
-          errorBuilder: (_, _, _) =>
+          errorBuilder: (context, error, stackTrace) =>
               fallback?.call() ?? const SizedBox.shrink(),
         );
       }
@@ -50,7 +50,7 @@ class AppNetworkImage extends StatelessWidget {
         path,
         fit: fit,
         cacheWidth: cacheWidth,
-        errorBuilder: (_, _, _) =>
+        errorBuilder: (context, error, stackTrace) =>
             fallback?.call() ?? const SizedBox.shrink(),
       );
     }
@@ -58,8 +58,8 @@ class AppNetworkImage extends StatelessWidget {
       imageUrl: path,
       fit: fit,
       memCacheWidth: cacheWidth,
-      placeholder: (_, _) => _placeholder(),
-      errorWidget: (_, _, _) =>
+      placeholder: (context, url) => _placeholder(),
+      errorWidget: (context, url, error) =>
           fallback?.call() ?? const SizedBox.shrink(),
     );
   }

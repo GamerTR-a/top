@@ -6,9 +6,11 @@ import '../models/auth_user_model.dart';
 import '../models/ticket_model.dart';
 import '../models/topluluk.dart';
 import '../services/supabase_data_service.dart';
+import '../utils/turkish_text.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
 import '../theme/app_theme.dart';
+import 'news_admin_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -634,12 +636,12 @@ class _AdminScreenState extends State<AdminScreen>
 
   Widget _buildCommunitiesTab() {
     final theme = themeNotifier.value;
-    final searchLower = _communitySearch.toLowerCase().trim();
+    final searchLower = turkishToLower(_communitySearch.trim());
     final filtered = _communities.where((c) {
       if (searchLower.isEmpty) return true;
-      return c.ad.toLowerCase().contains(searchLower) ||
-          c.kategori.toLowerCase().contains(searchLower) ||
-          c.baskanAdi.toLowerCase().contains(searchLower);
+      return turkishToLower(c.ad).contains(searchLower) ||
+          turkishToLower(c.kategori).contains(searchLower) ||
+          turkishToLower(c.baskanAdi).contains(searchLower);
     }).toList();
 
     return RefreshIndicator(
@@ -1522,6 +1524,7 @@ class _AdminScreenState extends State<AdminScreen>
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios, color: theme.primary),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Admin Paneli 👑',
@@ -1674,6 +1677,19 @@ class _AdminScreenState extends State<AdminScreen>
                       color: const Color(0xFF9D4EDD),
                       theme: theme,
                       onTap: _showSendUpdateNotificationDialog,
+                    ),
+                    _SettingsTile(
+                      icon: Icons.newspaper_rounded,
+                      title: 'Haber Bültenini Yönet 📰',
+                      subtitle: 'Anasayfa haber akışına içerik ekle/düzenle',
+                      color: const Color(0xFF00ACC1),
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const NewsAdminScreen()),
+                        );
+                      },
                     ),
                     _SettingsTile(
                       icon: Icons.lock_outline,

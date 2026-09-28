@@ -18,19 +18,18 @@ class DiscountCarousel extends StatelessWidget {
       valueListenable: themeNotifier,
       builder: (context, theme, _) {
         final screenWidth = MediaQuery.of(context).size.width;
-        final carouselHeight = (screenWidth * 0.45).clamp(165.0, 195.0);
-        final cardWidth = (screenWidth * 0.44).clamp(155.0, 190.0);
+        final horizontalPadding = screenWidth * 0.04;
+        const cardHeight = 165.0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: screenWidth * 0.04,
+                horizontal: horizontalPadding,
                 vertical: 8.0,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
@@ -70,42 +69,26 @@ class DiscountCarousel extends StatelessWidget {
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      Text(
-                        'Tümünü Gör',
-                        style: TextStyle(
-                          color: theme.primary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.arrow_forward,
-                        color: theme.primary,
-                        size: 14,
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
-            SizedBox(
-              height: carouselHeight,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.04),
-                itemCount: kuponlar.length,
-                itemBuilder: (context, index) {
-                  return FlipCouponCard(
-                    kupon: kuponlar[index],
-                    index: index,
-                    cardWidth: cardWidth,
-                    cardHeight: carouselHeight,
-                    theme: theme,
-                  );
-                },
+            // Kartlar satırı dolduracak şekilde alt alta dizilir; kaydırmayı
+            // üstteki ListView (NevFirsatlarScreen) yapar.
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+              child: Column(
+                children: [
+                  for (var index = 0; index < kuponlar.length; index++)
+                    FlipCouponCard(
+                      key: ValueKey(kuponlar[index].id),
+                      kupon: kuponlar[index],
+                      index: index,
+                      cardWidth: double.infinity,
+                      cardHeight: cardHeight,
+                      theme: theme,
+                      margin: const EdgeInsets.only(bottom: 12.0),
+                    ),
+                ],
               ),
             ),
           ],

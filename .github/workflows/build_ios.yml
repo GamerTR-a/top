@@ -35,16 +35,20 @@ jobs:
           PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
           KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          if [ -n "$PRIVATE_KEY" ]; then
-            echo "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID:-8NRWS5B4GM}.p8
-          elif [ -f "AuthKey_8NRWS5B4GM.p8" ]; then
-            cp AuthKey_8NRWS5B4GM.p8 ~/.appstoreconnect/private_keys/AuthKey_8NRWS5B4GM.p8
+          # Güvenlik: private key SADECE GitHub Secrets'tan okunur; repo içinden
+          # (.p8 dosyası) fallback KALDIRILDI — bu, Apple hesap düzeyinde imzalama
+          # anahtarının bir gün yanlışlıkla commit edilmesini teşvik eden bir
+          # anti-pattern'di. Secret eksikse build burada net bir hatayla durur.
+          if [ -z "$PRIVATE_KEY" ]; then
+            echo "::error::APP_STORE_CONNECT_PRIVATE_KEY secret'ı tanımlı değil. Repo Settings > Secrets and variables > Actions üzerinden ekleyin."
+            exit 1
           fi
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${KEY_ID:-8NRWS5B4GM}.p8
 
       - name: Build iOS App & Archive (No Codesign)
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --obfuscate --split-debug-info=build/debug-info
           cd ios
           xcodebuild -workspace Runner.xcworkspace \
             -scheme Runner \
@@ -53,6 +57,25 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" archive || true
+
+      - name: Upload Crashlytics dSYM symbols
+        run: |
+          # bkz. kontrol.md Bölüm 17.2 — Xcode'da Crashlytics "Run Script" build
+          # phase'i olmadığından dSYM'leri elle yüklüyoruz (codemagic.yaml ile
+          # aynı desen). Bu build imzasız/yayınlanmadığı için GoogleService-Info.plist
+          # secret'ı burada tanımlı değilse adım güvenle atlanır.
+          UPLOAD_SYMBOLS="ios/Pods/FirebaseCrashlytics/upload-symbols"
+          GSP="ios/Runner/GoogleService-Info.plist"
+          DSYMS_DIR="build/ios/archive/Runner.xcarchive/dSYMs"
+          if [ ! -f "$UPLOAD_SYMBOLS" ]; then
+            echo "::warning::upload-symbols bulunamadı ($UPLOAD_SYMBOLS) — dSYM yüklemesi atlandı."
+          elif [ ! -f "$GSP" ]; then
+            echo "::warning::GoogleService-Info.plist bulunamadı — dSYM yüklemesi atlandı."
+          elif [ ! -d "$DSYMS_DIR" ]; then
+            echo "::warning::dSYM klasörü bulunamadı ($DSYMS_DIR) — dSYM yüklemesi atlandı."
+          else
+            "$UPLOAD_SYMBOLS" -gsp "$GSP" -p ios "$DSYMS_DIR"
+          fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

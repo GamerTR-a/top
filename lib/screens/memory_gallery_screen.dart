@@ -125,6 +125,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Geri',
         ),
         title: Text(
           'Hatıra Galerisi 🔭',
@@ -134,6 +135,7 @@ class _MemoryGalleryScreenState extends State<MemoryGalleryScreen> {
           IconButton(
             icon: Icon(Icons.refresh, color: theme.primary),
             onPressed: _loadAlbums,
+            tooltip: 'Yenile',
           ),
         ],
       ),

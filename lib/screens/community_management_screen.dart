@@ -222,6 +222,7 @@ class _CommunityManagementScreenState extends State<CommunityManagementScreen>
               leading: IconButton(
                 icon: Icon(Icons.arrow_back_ios, color: theme.primary),
                 onPressed: () => Navigator.pop(context),
+                tooltip: 'Geri',
               ),
               title: Text(
                 'Topluluk Yönetimi',
@@ -608,6 +609,7 @@ class _CommunityManagementScreenState extends State<CommunityManagementScreen>
                       if (hasLink)
                         IconButton(
                           icon: Icon(Icons.copy, color: theme.textMuted, size: 20),
+                          tooltip: 'Linki Kopyala',
                           onPressed: () {
                             // Clipboard copy would go here
                             _showSnack('Link kopyalandı', theme.primary);

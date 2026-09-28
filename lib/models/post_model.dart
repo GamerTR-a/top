@@ -2,6 +2,7 @@ class PostModel {
   final int id;
   final String toplulukAdi;
   final String toplulukLogo;
+  final String kategori;
   final String metin;
   final String? resimUrl;
   final String tarih;
@@ -20,6 +21,7 @@ class PostModel {
     required this.id,
     required this.toplulukAdi,
     required this.toplulukLogo,
+    this.kategori = '',
     required this.metin,
     this.resimUrl,
     this.etkinlikGorseli,
@@ -52,6 +54,7 @@ class PostModel {
       id: id,
       toplulukAdi: toplulukAdi,
       toplulukLogo: toplulukLogo,
+      kategori: kategori,
       metin: metin,
       resimUrl: resimUrl,
       etkinlikGorseli: etkinlikGorseli,
@@ -69,11 +72,13 @@ class PostModel {
   }
 
   factory PostModel.fromApiJson(Map<String, dynamic> json) {
+    final communityJson = json['communities'] as Map<String, dynamic>?;
     return PostModel(
       id: (json['id'] as num).toInt(),
       toplulukAdi: json['community_name'] as String? ?? '',
       toplulukLogo:
           json['community_logo'] as String? ?? 'assets/gem.png',
+      kategori: communityJson?['category'] as String? ?? '',
       metin: json['content'] as String? ?? '',
       resimUrl: json['image_url'] as String?,
       etkinlikGorseli: json['event_image'] as String?,

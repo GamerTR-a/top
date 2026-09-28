@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	NevGenç uygulaması kullanıcıları reklam/analitik amacıyla diğer
+	şirketlerin uygulama ve web siteleri arasında izlemez (App Tracking
+	Transparency / IDFA kullanılmıyor).
+	-->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+
+	<!--
+	Uygulama, kullanıcı tercihlerini (tema, bildirim ayarı vb.) cihaz
+	üzerinde NSUserDefaults ile saklar (shared_preferences paketi).
+	Reason CA92.1: Yalnızca bu uygulamanın kendi verilerine erişim.
+	-->
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryDiskSpace</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>E174.1</string>
+			</array>
+		</dict>
+	</array>
+
+	<!--
+	App Store Connect > App Privacy formunda beyan edilen veri toplama
+	türleriyle senkron tutulmalıdır (bu dosya onun yerine geçmez).
+	Toplanan veri türleri (kayıt için e-posta, profil bilgisi, konum vb.)
+	Connect panelinden ayrıca işaretlenmelidir.
+	-->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+</dict>
+</plist>

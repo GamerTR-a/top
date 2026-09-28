@@ -3,6 +3,7 @@ import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_text_field.dart';
 import '../constants/departments.dart';
+import '../utils/turkish_text.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -25,6 +26,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _errorMsg;
   bool _showDepartmentDropdown = true;
 
+  // Geri tuşuna basınca doldurulan form yanlışlıkla kaybolmasın (bkz.
+  // kontrol.md Bölüm 23.7). Kayıt BAŞARILI olduğunda bu onay atlanmalı —
+  // _skipUnsavedConfirmation başarı akışlarında true'ya çekilir ve
+  // _pendingPopResult, onay sonrası (veya başarı sonrası) gerçekleşen
+  // pop çağrısında caller'a döndürülecek değeri taşır. `PopScope.canPop`
+  // resmi Flutter örneğindeki gibi (pop_scope.0.dart) sabit false kalabilir
+  // ama burada hızlı yol için `!_hasUnsavedChanges` kullanılıyor — geri kalan
+  // mantık, "engellenen ilk pop → onay/atla → tekrar pop çağır" örüntüsünü
+  // izliyor; bu ikinci çağrı canPop'un anlık değerinden bağımsız başarılı olur.
+  bool _skipUnsavedConfirmation = false;
+  Object? _pendingPopResult;
+  bool get _hasUnsavedChanges =>
+      !_skipUnsavedConfirmation &&
+      (_nameCtrl.text.trim().isNotEmpty ||
+          _emailCtrl.text.trim().isNotEmpty ||
+          _birthDateCtrl.text.trim().isNotEmpty ||
+          _passCtrl.text.isNotEmpty ||
+          _selectedDepartment != null);
+
+  Future<bool> _confirmDiscardChanges() async {
+    if (!_hasUnsavedChanges) return true;
+    final theme = themeNotifier.value;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surface,
+        title: Text('Kayıttan çık?', style: TextStyle(color: theme.textColor)),
+        content: Text(
+          'Girdiğin bilgiler kaydedilmeden kaybolacak. Çıkmak istediğine emin misin?',
+          style: TextStyle(color: theme.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: theme.error),
+            child: const Text('Çık'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _backIfConfirmed() async {
+    if (await _confirmDiscardChanges() && mounted) {
+      Navigator.pop(context, _pendingPopResult);
+    }
+  }
+
+  /// Başarılı kayıt/doğrulama sonrası çağrılır — onay dialogunu atlayarak
+  /// [result] değeriyle ekrandan çıkar (bkz. yukarıdaki not).
+  void _popWithSuccess(Object? result) {
+    _pendingPopResult = result;
+    _skipUnsavedConfirmation = true;
+    Navigator.pop(context, result);
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -45,7 +107,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   static bool _isValidEduEmail(String email) {
     final normalizedEmail = email.toLowerCase().trim();
-    return normalizedEmail.endsWith('.edu') || normalizedEmail.endsWith('.edu.tr');
+    return normalizedEmail.endsWith('.edu') ||
+        normalizedEmail.endsWith('.edu.tr');
   }
 
   Future<void> _selectBirthDate() async {
@@ -80,7 +143,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     if (!_isValidEduEmail(email)) {
-      setState(() => _errorMsg = 'Kayıt için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.');
+      setState(() => _errorMsg =
+          'Kayıt için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.');
       return;
     }
     if (_birthDateCtrl.text.trim().isEmpty) {
@@ -119,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthDate: _birthDateCtrl.text.trim(),
         department: _selectedDepartment!,
       );
-      if (mounted) Navigator.pop(context, user);
+      if (mounted) _popWithSuccess(user);
     } catch (e) {
       final msg = e.toString();
       if (msg.startsWith('Kayıt başarılı')) {
@@ -165,7 +229,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pop(context);
+              _popWithSuccess(null);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.primary,
@@ -181,55 +245,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = themeNotifier.value;
-    return Scaffold(
-      backgroundColor: theme.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
-          onPressed: () => Navigator.pop(context),
+    return PopScope(
+      canPop: !_hasUnsavedChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _backIfConfirmed();
+      },
+      child: Scaffold(
+        backgroundColor: theme.background,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
+            onPressed: _backIfConfirmed,
+            tooltip: 'Geri',
+          ),
+          title: Text(
+            'Kayıt Ol',
+            style:
+                TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
+          ),
         ),
-        title: Text(
-          'Kayıt Ol',
-          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: theme.primary.withValues(alpha: 0.4),
-                        blurRadius: 16,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Image.asset(
-                        'assets/app_logo.png',
-                        fit: BoxFit.contain,
-                        errorBuilder: (ctx, err, stack) => const Center(
-                          child: Text(
-                            'N',
-                            style: TextStyle(
-                              color: Color(0xFF023E8A),
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primary.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Image.asset(
+                          'assets/app_logo.png',
+                          fit: BoxFit.contain,
+                          errorBuilder: (ctx, err, stack) => const Center(
+                            child: Text(
+                              'N',
+                              style: TextStyle(
+                                color: Color(0xFF023E8A),
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
@@ -237,186 +310,196 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  'Hesap Oluştur',
-                  style: TextStyle(
-                    color: theme.textColor,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Center(
-                child: Text(
-                  'Topluluğa katılmak için kaydol',
-                  style: TextStyle(color: theme.textMuted, fontSize: 13),
-                ),
-              ),
-              const SizedBox(height: 28),
-              _buildLabel('Ad Soyad', theme),
-              _buildField(
-                controller: _nameCtrl,
-                hint: 'Adınız ve soyadınız',
-                icon: Icons.person_outline,
-                theme: theme,
-              ),
-              const SizedBox(height: 16),
-              _buildLabel('E-posta', theme),
-              _buildField(
-                controller: _emailCtrl,
-                hint: 'ornek@subu.edu.tr / ornek@uni.edu',
-                icon: Icons.email_outlined,
-                keyboardType: TextInputType.emailAddress,
-                theme: theme,
-              ),
-              const SizedBox(height: 16),
-              _buildLabel('Doğum Tarihi', theme),
-              GestureDetector(
-                onTap: _selectBirthDate,
-                child: AbsorbPointer(
-                  child: _buildField(
-                    controller: _birthDateCtrl,
-                    hint: 'GG.AA.YYYY (Örn: 15.05.2002)',
-                    icon: Icons.cake_outlined,
-                    theme: theme,
-                    suffix: IconButton(
-                      icon: Icon(Icons.calendar_month_outlined, color: theme.primary, size: 20),
-                      onPressed: _selectBirthDate,
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    'Hesap Oluştur',
+                    style: TextStyle(
+                      color: theme.textColor,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildLabel('Bölümünüz', theme),
-              _buildDepartmentSelector(theme),
-              const SizedBox(height: 16),
-              _buildLabel('Şifre', theme),
-              _buildField(
-                controller: _passCtrl,
-                hint: 'En az 8 karakter, büyük harf ve rakam',
-                icon: Icons.lock_outline,
-                obscure: !_passVisible,
-                theme: theme,
-                suffix: IconButton(
-                  icon: Icon(
-                    _passVisible
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: theme.textMuted,
-                    size: 20,
-                  ),
-                  onPressed: () => setState(() => _passVisible = !_passVisible),
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildLabel('Şifre Tekrar', theme),
-              _buildField(
-                controller: _passConfirmCtrl,
-                hint: 'Şifrenizi tekrar girin',
-                icon: Icons.lock_outline,
-                obscure: !_passConfirmVisible,
-                theme: theme,
-                suffix: IconButton(
-                  icon: Icon(
-                    _passConfirmVisible
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                    color: theme.textMuted,
-                    size: 20,
-                  ),
-                  onPressed: () => setState(
-                    () => _passConfirmVisible = !_passConfirmVisible,
+                Center(
+                  child: Text(
+                    'Topluluğa katılmak için kaydol',
+                    style: TextStyle(color: theme.textMuted, fontSize: 13),
                   ),
                 ),
-              ),
-              if (_errorMsg != null) ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.error.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.error.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: theme.error, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMsg!,
-                          style: TextStyle(color: theme.error, fontSize: 13),
-                        ),
+                const SizedBox(height: 28),
+                _buildLabel('Ad Soyad', theme),
+                _buildField(
+                  controller: _nameCtrl,
+                  hint: 'Adınız ve soyadınız',
+                  icon: Icons.person_outline,
+                  theme: theme,
+                ),
+                const SizedBox(height: 16),
+                _buildLabel('E-posta', theme),
+                _buildField(
+                  controller: _emailCtrl,
+                  hint: 'ornek@subu.edu.tr / ornek@uni.edu',
+                  icon: Icons.email_outlined,
+                  keyboardType: TextInputType.emailAddress,
+                  theme: theme,
+                  autofillHints: const [AutofillHints.email],
+                ),
+                const SizedBox(height: 16),
+                _buildLabel('Doğum Tarihi', theme),
+                GestureDetector(
+                  onTap: _selectBirthDate,
+                  child: AbsorbPointer(
+                    child: _buildField(
+                      controller: _birthDateCtrl,
+                      hint: 'GG.AA.YYYY (Örn: 15.05.2002)',
+                      icon: Icons.cake_outlined,
+                      theme: theme,
+                      suffix: IconButton(
+                        icon: Icon(Icons.calendar_month_outlined,
+                            color: theme.primary, size: 20),
+                        onPressed: _selectBirthDate,
+                        tooltip: 'Doğum Tarihi Seç',
                       ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: _loading ? null : _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 4,
                   ),
-                  child: _loading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
-                      : const Text(
-                          'Kayıt Ol',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Center(
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: RichText(
-                    text: TextSpan(
-                      text: 'Zaten hesabın var mı? ',
-                      style: TextStyle(color: theme.textMuted),
+                const SizedBox(height: 16),
+                _buildLabel('Bölümünüz', theme),
+                _buildDepartmentSelector(theme),
+                const SizedBox(height: 16),
+                _buildLabel('Şifre', theme),
+                _buildField(
+                  controller: _passCtrl,
+                  hint: 'En az 8 karakter, büyük harf ve rakam',
+                  icon: Icons.lock_outline,
+                  obscure: !_passVisible,
+                  theme: theme,
+                  autofillHints: const [AutofillHints.newPassword],
+                  suffix: IconButton(
+                    icon: Icon(
+                      _passVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: theme.textMuted,
+                      size: 20,
+                    ),
+                    tooltip: _passVisible ? 'Şifreyi Gizle' : 'Şifreyi Göster',
+                    onPressed: () =>
+                        setState(() => _passVisible = !_passVisible),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildLabel('Şifre Tekrar', theme),
+                _buildField(
+                  controller: _passConfirmCtrl,
+                  hint: 'Şifrenizi tekrar girin',
+                  icon: Icons.lock_outline,
+                  obscure: !_passConfirmVisible,
+                  theme: theme,
+                  autofillHints: const [AutofillHints.newPassword],
+                  suffix: IconButton(
+                    icon: Icon(
+                      _passConfirmVisible
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: theme.textMuted,
+                      size: 20,
+                    ),
+                    tooltip: _passConfirmVisible
+                        ? 'Şifreyi Gizle'
+                        : 'Şifreyi Göster',
+                    onPressed: () => setState(
+                      () => _passConfirmVisible = !_passConfirmVisible,
+                    ),
+                  ),
+                ),
+                if (_errorMsg != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.error.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.error.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        TextSpan(
-                          text: 'Giriş Yap',
-                          style: TextStyle(
-                            color: theme.primary,
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
-                            decorationColor: theme.primary,
+                        Icon(Icons.error_outline, color: theme.error, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _errorMsg!,
+                            style: TextStyle(color: theme.error, fontSize: 13),
                           ),
                         ),
                       ],
                     ),
                   ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _loading ? null : _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          )
+                        : const Text(
+                            'Kayıt Ol',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 16),
+                Center(
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'Zaten hesabın var mı? ',
+                        style: TextStyle(color: theme.textMuted),
+                        children: [
+                          TextSpan(
+                            text: 'Giriş Yap',
+                            style: TextStyle(
+                              color: theme.primary,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                              decorationColor: theme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -445,6 +528,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     bool obscure = false,
     TextInputType? keyboardType,
     Widget? suffix,
+    Iterable<String>? autofillHints,
   }) {
     return AppTextField(
       controller: controller,
@@ -454,18 +538,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       obscure: obscure,
       keyboardType: keyboardType,
       suffix: suffix,
+      autofillHints: autofillHints,
     );
   }
 
   Widget _buildDepartmentSelector(AppTheme theme) {
-    final filterQuery = _deptSearchCtrl.text.trim().toLowerCase();
+    final filterQuery = turkishToLower(_deptSearchCtrl.text.trim());
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Seçim Alanı Başlığı / Seçilen Bölüm
         InkWell(
-          onTap: () => setState(() => _showDepartmentDropdown = !_showDepartmentDropdown),
+          onTap: () => setState(
+              () => _showDepartmentDropdown = !_showDepartmentDropdown),
           borderRadius: BorderRadius.circular(16),
           child: Container(
             width: double.infinity,
@@ -494,16 +580,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Text(
                     _selectedDepartment ?? 'Bölümünüzü seçin (Radio listesi)',
                     style: TextStyle(
-                      color: _selectedDepartment != null ? theme.textColor : theme.textMuted,
+                      color: _selectedDepartment != null
+                          ? theme.textColor
+                          : theme.textMuted,
                       fontSize: 14,
-                      fontWeight: _selectedDepartment != null ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: _selectedDepartment != null
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
                 AnimatedRotation(
                   turns: _showDepartmentDropdown ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: Icon(Icons.keyboard_arrow_down, color: theme.textMuted, size: 24),
+                  child: Icon(Icons.keyboard_arrow_down,
+                      color: theme.textMuted, size: 24),
                 ),
               ],
             ),
@@ -530,19 +621,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: TextStyle(color: theme.textColor, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'Bölüm ara...',
-                      hintStyle: TextStyle(color: theme.textMuted, fontSize: 13),
-                      prefixIcon: Icon(Icons.search, color: theme.primary, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      hintStyle:
+                          TextStyle(color: theme.textMuted, fontSize: 13),
+                      prefixIcon:
+                          Icon(Icons.search, color: theme.primary, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 12),
                       filled: true,
                       fillColor: theme.background.withValues(alpha: 0.5),
                       isDense: true,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
+                        borderSide: BorderSide(
+                            color: theme.primary.withValues(alpha: 0.2)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
+                        borderSide: BorderSide(
+                            color: theme.primary.withValues(alpha: 0.2)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -559,7 +655,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       children: kDepartmentsByCategory.entries.map((entry) {
                         final filteredDepts = entry.value.where((dept) {
                           if (filterQuery.isEmpty) return true;
-                          return dept.toLowerCase().contains(filterQuery);
+                          return turkishToLower(dept).contains(filterQuery);
                         }).toList();
 
                         if (filteredDepts.isEmpty) {
@@ -593,14 +689,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   });
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? theme.primary.withValues(alpha: 0.12)
                                         : Colors.transparent,
                                     border: Border(
                                       bottom: BorderSide(
-                                        color: theme.primary.withValues(alpha: 0.04),
+                                        color: theme.primary
+                                            .withValues(alpha: 0.04),
                                       ),
                                     ),
                                   ),
@@ -649,7 +747,3 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 }
-
-
-
-

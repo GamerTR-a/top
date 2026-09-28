@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       widget.onLoginSuccess(user);
     } catch (e) {
-      setState(() => _errorMsg = e.toString());
+      if (mounted) setState(() => _errorMsg = e.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -211,6 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           icon: Icons.email_outlined,
                           keyboardType: TextInputType.emailAddress,
                           theme: theme,
+                          autofillHints: const [AutofillHints.email],
                         ),
                         const SizedBox(height: 16),
                         _Field(
@@ -219,6 +220,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           icon: Icons.lock_outline,
                           obscure: !_passVisible,
                           theme: theme,
+                          autofillHints: const [AutofillHints.password],
                           suffix: IconButton(
                             icon: Icon(
                               _passVisible
@@ -227,6 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: theme.textMuted,
                               size: 20,
                             ),
+                            tooltip: _passVisible ? 'Şifreyi Gizle' : 'Şifreyi Göster',
                             onPressed: () => setState(() => _passVisible = !_passVisible),
                           ),
                         ),
@@ -354,6 +357,7 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final Widget? suffix;
   final AppTheme theme;
+  final Iterable<String>? autofillHints;
 
   const _Field({
     required this.controller,
@@ -363,6 +367,7 @@ class _Field extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.suffix,
+    this.autofillHints,
   });
 
   @override
@@ -375,6 +380,7 @@ class _Field extends StatelessWidget {
       obscure: obscure,
       keyboardType: keyboardType,
       suffix: suffix,
+      autofillHints: autofillHints,
     );
   }
 }

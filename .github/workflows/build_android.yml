@@ -1,0 +1,99 @@
+# Android App Bundle (AAB) derleme workflow'u.
+# Şimdiye kadar Android release'i yalnızca yerel build_aab.ps1 scripti ile
+# üretiliyordu (bkz. kontrol.md Bölüm 31.4) — bu CI, aynı komutu (--obfuscate
+# --split-debug-info dahil) her push'ta bulutta da çalıştırır.
+#
+# Gerekli GitHub Secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64   → `certutil -encode android\newgenc-release.jks keystore.b64`
+#                                (Windows) veya `base64 -w0 newgenc-release.jks` (Linux/Mac)
+#                                ile üretilip dosyanın TAMAMI (BEGIN/END satırları
+#                                olmadan, certutil çıktısındaki başlık/son satırlarını
+#                                silerek) secret olarak eklenir.
+#   ANDROID_KEY_ALIAS         → android/key.properties.template'teki keyAlias (newgenc)
+#   ANDROID_KEY_PASSWORD      → keystore key şifresi
+#   ANDROID_STORE_PASSWORD    → keystore mağaza şifresi
+#   GOOGLE_SERVICES_JSON_BASE64 → `android/app/google-services.json` dosyasının base64'ü
+#                                  (Firebase Console → Proje Ayarları → Uygulamalarım'dan indirilir)
+#
+# Herhangi bir secret eksikse build net bir hatayla durur (sessiz debug-signed
+# paket üretme riskini önlemek için — bkz. android/app/build.gradle.kts guard'ı).
+
+name: Android AAB Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'android/**'
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/build_android.yml'
+
+jobs:
+  build-aab:
+    name: AAB Derle (Android)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Flutter kur
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Java kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: İmzalama anahtarı ve google-services.json'ı secret'lardan oluştur
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ] || [ -z "$STORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD / ANDROID_STORE_PASSWORD secret'larından biri eksik. Repo Settings > Secrets and variables > Actions üzerinden ekleyin."
+            exit 1
+          fi
+          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON_BASE64 secret'ı tanımlı değil."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/newgenc-release.jks
+          cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=../newgenc-release.jks
+          EOF
+          echo "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > android/app/google-services.json
+
+      - name: Bağımlılıkları indir
+        run: flutter pub get
+
+      - name: AppBundle (AAB) derle
+        run: flutter build appbundle --release --no-tree-shake-icons --obfuscate --split-debug-info=build/debug-info
+
+      - name: AAB'yi artifact olarak yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: NevGenc-android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Debug sembollerini artifact olarak yükle (crash sembolikasyonu için)
+        uses: actions/upload-artifact@v4
+        with:
+          name: NevGenc-android-debug-symbols
+          path: build/debug-info
+          if-no-files-found: warn
+</content>

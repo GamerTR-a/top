@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/auth_user_model.dart' show departmentText;
 import '../models/topluluk.dart';
 import '../services/supabase_data_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/secure_screen.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
+import 'baskan_panel/members_tab.dart';
+import 'baskan_panel/posts_tab.dart';
+import 'baskan_panel/links_tab.dart';
+import 'baskan_panel/notify_tab.dart';
 
 
 class BaskanPanelScreen extends StatefulWidget {
@@ -41,19 +47,30 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
   final _instagramCtrl = TextEditingController();
   bool _savingLinks = false;
 
+  final _notifTitleCtrl = TextEditingController();
+  final _notifBodyCtrl = TextEditingController();
+  final Set<String> _selectedRecipientIds = {};
+  bool _sendingNotification = false;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    // Üye e-posta listesi görev değiştirici önizlemesinde/ekran görüntüsünde
+    // görünmesin (bkz. kontrol.md Bölüm 7 — FLAG_SECURE).
+    SecureScreen.enable();
     _initData();
   }
 
   @override
   void dispose() {
+    SecureScreen.disable();
     _tabController.dispose();
     _whatsappCtrl.dispose();
     _telegramCtrl.dispose();
     _instagramCtrl.dispose();
+    _notifTitleCtrl.dispose();
+    _notifBodyCtrl.dispose();
     super.dispose();
   }
 
@@ -106,6 +123,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
   }
 
   Future<void> _loadCommunityDetails(int communityId) async {
+    _selectedRecipientIds.clear();
     _loadMembers(communityId);
     _loadPosts(communityId);
     _loadLinks(communityId);
@@ -335,6 +353,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new, color: theme.primary),
           onPressed: () => Navigator.pop(context),
+          tooltip: 'Geri',
         ),
         title: Row(
           children: [
@@ -365,19 +384,58 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                           indicatorColor: theme.primary,
                           labelColor: theme.primary,
                           unselectedLabelColor: theme.textMuted,
+                          isScrollable: true,
                           tabs: const [
                             Tab(icon: Icon(Icons.people_outline), text: 'Üyeler & Mailler'),
                             Tab(icon: Icon(Icons.article_outlined), text: 'Gönderiler'),
                             Tab(icon: Icon(Icons.link_outlined), text: 'Bağlantılar'),
+                            Tab(icon: Icon(Icons.campaign_outlined), text: 'Bildirim Gönder'),
                           ],
                         ),
                         Expanded(
                           child: TabBarView(
                             controller: _tabController,
                             children: [
-                              _buildMembersTab(theme),
-                              _buildPostsTab(theme),
-                              _buildLinksTab(theme),
+                              MembersTab(
+                                theme: theme,
+                                loading: _loadingMembers,
+                                members: _members,
+                                searchQuery: _memberSearchQuery,
+                                onSearchChanged: (val) =>
+                                    setState(() => _memberSearchQuery = val),
+                                onCopyAllEmails: _copyAllEmails,
+                                onRemoveMember: _removeMember,
+                                onCopyToClipboard: _copyToClipboard,
+                              ),
+                              PostsTab(
+                                theme: theme,
+                                loading: _loadingPosts,
+                                posts: _posts,
+                                onDeletePost: _deletePost,
+                                onShowEventParticipants:
+                                    _showEventParticipantsModal,
+                              ),
+                              LinksTab(
+                                theme: theme,
+                                whatsappController: _whatsappCtrl,
+                                telegramController: _telegramCtrl,
+                                instagramController: _instagramCtrl,
+                                saving: _savingLinks,
+                                onSave: _saveLinks,
+                              ),
+                              NotifyTab(
+                                theme: theme,
+                                loadingMembers: _loadingMembers,
+                                members: _members,
+                                selectedCommunityName: _selectedCommunity?.ad,
+                                selectedRecipientIds: _selectedRecipientIds,
+                                onToggleRecipient: _toggleRecipient,
+                                onToggleSelectAll: _toggleSelectAllRecipients,
+                                titleController: _notifTitleCtrl,
+                                bodyController: _notifBodyCtrl,
+                                sending: _sendingNotification,
+                                onSend: _confirmAndSendNotification,
+                              ),
                             ],
                           ),
                         ),
@@ -531,264 +589,6 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
     );
   }
 
-  // ── 1. ÜYELER VE E-POSTALAR TABI ──────────────────────────────────────────
-  Widget _buildMembersTab(AppTheme theme) {
-    if (_loadingMembers) {
-      return Center(child: CircularProgressIndicator(color: theme.primary));
-    }
-
-    final query = _memberSearchQuery.toLowerCase().trim();
-    final filtered = _members.where((m) {
-      final profile = m['profiles'] as Map<String, dynamic>?;
-      if (profile == null) return false;
-      final name = (profile['name'] as String? ?? '').toLowerCase();
-      final email = (profile['email'] as String? ?? '').toLowerCase();
-      final dept = (profile['department'] as String? ?? '').toLowerCase();
-      return query.isEmpty ||
-          name.contains(query) ||
-          email.contains(query) ||
-          dept.contains(query);
-    }).toList();
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          // Arama çubuğu ve Tüm Mailleri Kopyala Butonu
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  onChanged: (val) => setState(() => _memberSearchQuery = val),
-                  style: TextStyle(color: theme.textColor, fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Üye adı, e-posta veya bölüm ara...',
-                    hintStyle: TextStyle(color: theme.textMuted, fontSize: 13),
-                    prefixIcon: Icon(Icons.search, color: theme.primary, size: 20),
-                    isDense: true,
-                    filled: true,
-                    fillColor: theme.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              ElevatedButton.icon(
-                onPressed: () => _copyAllEmails(filtered),
-                icon: const Icon(Icons.copy, size: 16, color: Colors.white),
-                label: const Text(
-                  'Tüm Mailler',
-                  style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Toplam Üye Sayacı
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Topluluk Üyeleri (${filtered.length} Kişi)',
-                style: TextStyle(
-                  color: theme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                'E-Postaları kopyalamak için tıklayın',
-                style: TextStyle(color: theme.textMuted, fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Üye Kartları Listesi
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text(
-                      'Üye bulunamadı.',
-                      style: TextStyle(color: theme.textMuted),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: filtered.length,
-                    itemBuilder: (ctx, index) {
-                      final item = filtered[index];
-                      final profile = item['profiles'] as Map<String, dynamic>? ?? {};
-                      final userId = profile['id'] as String? ?? item['user_id'] as String;
-                      final name = profile['name'] as String? ?? 'İsimsiz Üye';
-                      final email = profile['email'] as String? ?? 'E-posta Yok';
-                      final photo = profile['profile_photo'] as String?;
-                      final dept = profile['department'] as String?;
-                      final role = profile['role'] as String? ?? 'student';
-                      final joinedAtRaw = item['joined_at'] as String?;
-
-                      String joinedDateStr = '';
-                      if (joinedAtRaw != null) {
-                        try {
-                          final dt = DateTime.parse(joinedAtRaw);
-                          joinedDateStr = '${dt.day}.${dt.month}.${dt.year}';
-                        } catch (_) {}
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.primary.withValues(alpha: 0.15),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: theme.primary.withValues(alpha: 0.2),
-                                  child: photo != null && photo.isNotEmpty
-                                      ? ClipOval(
-                                          child: AppNetworkImage(
-                                            path: photo,
-                                            fit: BoxFit.cover,
-                                            fallback: () => Icon(
-                                              Icons.person,
-                                              color: theme.primary,
-                                              size: 20,
-                                            ),
-                                          ),
-                                        )
-                                      : Icon(Icons.person, color: theme.primary, size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              name,
-                                              style: TextStyle(
-                                                color: theme.textColor,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          if (role == 'baskan' || role == 'admin')
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: theme.secondary.withValues(alpha: 0.2),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                role == 'admin' ? 'Admin' : 'Başkan',
-                                                style: TextStyle(
-                                                  color: theme.secondary,
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                      if (dept != null && dept.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          dept,
-                                          style: TextStyle(
-                                            color: theme.textMuted,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.person_remove_outlined, color: theme.error, size: 20),
-                                  tooltip: 'Üyeyi Çıkar',
-                                  onPressed: () => _removeMember(userId, name),
-                                ),
-                              ],
-                            ),
-                            const Divider(height: 14),
-                            // E-Posta Alanı (Vurgulu ve Kopyala Butonlu)
-                            InkWell(
-                              onTap: () => _copyToClipboard(email, 'E-posta'),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: theme.primary.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: theme.primary.withValues(alpha: 0.15),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.email_outlined, size: 16, color: theme.primary),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        email,
-                                        style: TextStyle(
-                                          color: theme.textColor,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    Icon(Icons.copy, size: 14, color: theme.primary),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (joinedDateStr.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4),
-                                child: Text(
-                                  'Katılım Tarihi: $joinedDateStr',
-                                  style: TextStyle(color: theme.textMuted, fontSize: 10),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _showEventParticipantsModal(int postId, String content) async {
     final theme = themeNotifier.value;
@@ -875,7 +675,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                               final profile = item['profiles'] as Map<String, dynamic>? ?? {};
                               final name = profile['name'] as String? ?? 'Öğrenci';
                               final email = profile['email'] as String? ?? '';
-                              final dept = profile['department'] as String?;
+                              final dept = departmentText(profile['department']);
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
@@ -926,6 +726,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                                     IconButton(
                                       icon: Icon(Icons.copy, color: theme.primary, size: 18),
                                       onPressed: () => _copyToClipboard(email, 'E-posta'),
+                                      tooltip: 'E-postayı Kopyala',
                                     ),
                                   ],
                                 ),
@@ -942,251 +743,122 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
     );
   }
 
-  // ── 2. GÖNDERİLER VE MODERASYON TABI ──────────────────────────────────────
-  Widget _buildPostsTab(AppTheme theme) {
-    if (_loadingPosts) {
-      return Center(child: CircularProgressIndicator(color: theme.primary));
+
+
+  // ── NotifyTab (bkz. baskan_panel/notify_tab.dart) için seçim yardımcıları ──
+  void _toggleRecipient(String userId, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedRecipientIds.add(userId);
+      } else {
+        _selectedRecipientIds.remove(userId);
+      }
+    });
+  }
+
+  void _toggleSelectAllRecipients() {
+    final allIds = _members
+        .map((m) {
+          final profile = m['profiles'] as Map<String, dynamic>?;
+          return profile?['id'] as String? ?? m['user_id'] as String?;
+        })
+        .whereType<String>()
+        .toSet();
+    final allSelected =
+        allIds.isNotEmpty && _selectedRecipientIds.length == allIds.length;
+    setState(() {
+      if (allSelected) {
+        _selectedRecipientIds.clear();
+      } else {
+        _selectedRecipientIds
+          ..clear()
+          ..addAll(allIds);
+      }
+    });
+  }
+
+  Future<void> _confirmAndSendNotification() async {
+    final theme = themeNotifier.value;
+    final title = _notifTitleCtrl.text.trim();
+    final body = _notifBodyCtrl.text.trim();
+
+    if (title.isEmpty || body.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('Başlık ve mesaj zorunludur.'), backgroundColor: theme.error),
+      );
+      return;
     }
+    if (_selectedRecipientIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: const Text('En az bir alıcı seçmelisin.'), backgroundColor: theme.error),
+      );
+      return;
+    }
+    if (_selectedCommunity == null) return;
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Topluluk Akış Gönderileri (${_posts.length})',
-            style: TextStyle(
-              color: theme.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Gönderimi Onayla', style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_selectedRecipientIds.length} üyeye bildirim gönderilecek:',
+              style: TextStyle(color: theme.textMuted, fontSize: 13),
             ),
+            const SizedBox(height: 12),
+            Text(title, style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(body, style: TextStyle(color: theme.textColor.withValues(alpha: 0.85), fontSize: 13)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Vazgeç', style: TextStyle(color: theme.textMuted)),
           ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: _posts.isEmpty
-                ? Center(
-                    child: Text(
-                      'Bu topluluğa henüz gönderi paylaşılmamış.',
-                      style: TextStyle(color: theme.textMuted),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _posts.length,
-                    itemBuilder: (ctx, index) {
-                      final p = _posts[index];
-                      final postId = (p['id'] as num).toInt();
-                      final content = p['content'] as String? ?? '';
-                      final createdAt = p['created_at'] as String? ?? '';
-                      final imageUrl = p['image_url'] as String?;
-                      final isEvent = p['is_event'] as bool? ?? false;
-
-                      return Card(
-                        color: theme.surface,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(color: theme.primary.withValues(alpha: 0.15)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: SizedBox(
-                                        width: 50,
-                                        height: 50,
-                                        child: AppNetworkImage(
-                                          path: imageUrl,
-                                          fit: BoxFit.cover,
-                                          fallback: () => Container(
-                                            width: 50,
-                                            height: 50,
-                                            color: theme.primary.withValues(alpha: 0.1),
-                                            child: Icon(Icons.image, color: theme.primary),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                  ],
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          content,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: theme.textColor,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          createdAt,
-                                          style: TextStyle(
-                                            color: theme.textMuted,
-                                            fontSize: 10,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.delete_outline, color: theme.error, size: 20),
-                                    onPressed: () => _deletePost(postId),
-                                  ),
-                                ],
-                              ),
-                              if (isEvent) ...[
-                                const Divider(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _showEventParticipantsModal(postId, content),
-                                    icon: Icon(Icons.people_outline, color: theme.primary, size: 18),
-                                    label: Text(
-                                      'Etkinlik Katılımcıları & Mailleri 📋',
-                                      style: TextStyle(color: theme.primary, fontSize: 12, fontWeight: FontWeight.bold),
-                                    ),
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(color: theme.primary.withValues(alpha: 0.4)),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: theme.primary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Gönder'),
           ),
         ],
       ),
     );
-  }
+    if (confirmed != true) return;
 
-
-  // ── 3. SOSYAL BAĞLANTILAR VE AYARLAR TABI ────────────────────────────────
-  Widget _buildLinksTab(AppTheme theme) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Topluluk İletişim Bağlantıları',
-            style: TextStyle(
-              color: theme.primary,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Üyelerinize sunulacak sosyal medya ve iletişim gruplarının linklerini güncelleyin.',
-            style: TextStyle(color: theme.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 20),
-          _buildLinkField(
-            controller: _whatsappCtrl,
-            label: 'WhatsApp Grubu Linki',
-            icon: Icons.chat_bubble_outline,
-            hint: 'https://chat.whatsapp.com/...',
-            theme: theme,
-          ),
-          const SizedBox(height: 14),
-          _buildLinkField(
-            controller: _telegramCtrl,
-            label: 'Telegram Grubu Linki',
-            icon: Icons.send_outlined,
-            hint: 'https://t.me/...',
-            theme: theme,
-          ),
-          const SizedBox(height: 14),
-          _buildLinkField(
-            controller: _instagramCtrl,
-            label: 'Instagram Sayfası Linki',
-            icon: Icons.camera_alt_outlined,
-            hint: 'https://instagram.com/...',
-            theme: theme,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _savingLinks ? null : _saveLinks,
-              icon: _savingLinks
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save, color: Colors.white),
-              label: const Text(
-                'Bağlantıları Kaydet',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLinkField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    required String hint,
-    required AppTheme theme,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold, fontSize: 13),
+    setState(() => _sendingNotification = true);
+    try {
+      final res = await _api.sendCommunityNotification(
+        communityId: _selectedCommunity!.id,
+        title: title,
+        body: body,
+        recipientIds: _selectedRecipientIds.toList(),
+      );
+      final sentCount = (res['sent_count'] as num?)?.toInt() ?? _selectedRecipientIds.length;
+      if (!mounted) return;
+      _notifTitleCtrl.clear();
+      _notifBodyCtrl.clear();
+      setState(() {
+        _selectedRecipientIds.clear();
+        _sendingNotification = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Bildirim $sentCount üyeye gönderildi. 📨'),
+          backgroundColor: theme.primary,
         ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          style: TextStyle(color: theme.textColor, fontSize: 13),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: TextStyle(color: theme.textMuted, fontSize: 13),
-            prefixIcon: Icon(icon, color: theme.primary, size: 20),
-            filled: true,
-            fillColor: theme.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.primary.withValues(alpha: 0.2)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: theme.primary),
-            ),
-          ),
-        ),
-      ],
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _sendingNotification = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gönderilemedi: $e'), backgroundColor: theme.error),
+      );
+    }
   }
 }

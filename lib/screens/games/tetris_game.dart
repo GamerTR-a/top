@@ -286,6 +286,7 @@ class _TetrisGameState extends State<TetrisGame> {
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.textColor),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Tetris',
@@ -303,6 +304,7 @@ class _TetrisGameState extends State<TetrisGame> {
                     _paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                     color: theme.textColor,
                   ),
+                  tooltip: _paused ? 'Devam Et' : 'Duraklat',
                   onPressed: _togglePause,
                 ),
             ],

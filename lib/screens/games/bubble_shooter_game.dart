@@ -571,6 +571,7 @@ class _BubbleShooterGameState extends State<BubbleShooterGame>
             leading: IconButton(
               icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.textColor),
               onPressed: () => Navigator.pop(context),
+              tooltip: 'Geri',
             ),
             title: Text(
               'Baloncuk Patlatma',

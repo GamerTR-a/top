@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:safe_device/safe_device.dart';
 import '../models/discount_model.dart';
 import '../services/location_service.dart';
 import '../services/supabase_data_service.dart';
@@ -14,6 +15,7 @@ class FlipCouponCard extends StatefulWidget {
   final double cardWidth;
   final double cardHeight;
   final AppTheme theme;
+  final EdgeInsetsGeometry margin;
   final Function(DiscountModel updatedKupon)? onKuponUpdated;
 
   const FlipCouponCard({
@@ -24,6 +26,7 @@ class FlipCouponCard extends StatefulWidget {
     required this.cardHeight,
     required this.theme,
     this.onKuponUpdated,
+    this.margin = const EdgeInsets.only(right: 12.0),
   });
 
   @override
@@ -92,6 +95,24 @@ class _FlipCouponCardState extends State<FlipCouponCard>
     });
 
     try {
+      // 0. Sahte konum (mock location) uygulaması kontrolü — GPS spoofing ile
+      // uzaktan kupon açma girişimlerine karşı istemci tarafı ek bir bariyer
+      // (sunucu tarafındaki gerçek mesafe kontrolüne ek olarak; bkz. kontrol.md
+      // Bölüm 9.6/9.7). Kontrol başarısız olursa (paket hatası vb.) sessizce
+      // devam edilir — asıl güvenlik sunucu tarafında zaten sağlanıyor.
+      final mockLocation = await SafeDevice.isMockLocation;
+      if (mockLocation) {
+        if (mounted) {
+          setState(() {
+            _isLoadingLocation = false;
+            _errorMessage =
+                'Sahte konum (mock location) uygulaması tespit edildi. '
+                'Kupon almak için lütfen gerçek konumunuzu kullanın.';
+          });
+        }
+        return;
+      }
+
       // 1. Konum al
       final position = await LocationService.getCurrentPosition();
 
@@ -105,16 +126,12 @@ class _FlipCouponCardState extends State<FlipCouponCard>
 
       _userDistanceMeters = distance;
 
-      // 3. Supabase RPC claim_coupon çağrısı
+      // 3. Supabase RPC claim_coupon çağrısı — mesafe/geofence kontrolü ve
+      // kod üretimi sunucuda yapılır, istemci yalnızca konumu gönderir.
       final result = await _dataService.claimCoupon(
         discountId: widget.kupon.id,
         userLat: position.latitude,
         userLng: position.longitude,
-        merchantLat: widget.kupon.latitude,
-        merchantLng: widget.kupon.longitude,
-        geofenceRadiusMeters: widget.kupon.geofenceRadiusMeters,
-        categoryPrefix: widget.kupon.categoryPrefix,
-        merchantChar: widget.kupon.merchantCodeChar,
       );
 
       if (mounted) {
@@ -164,7 +181,8 @@ class _FlipCouponCardState extends State<FlipCouponCard>
 
     return Container(
       width: widget.cardWidth,
-      margin: const EdgeInsets.only(right: 12.0),
+      height: widget.cardHeight,
+      margin: widget.margin,
       child: GestureDetector(
         onDoubleTap: _flipCard,
         child: AnimatedBuilder(
@@ -547,7 +565,7 @@ class _FlipCouponCardState extends State<FlipCouponCard>
                 ),
               ),
               child: const Text(
-                'Tekrar Deneye',
+                'Tekrar Dene',
                 style: TextStyle(fontSize: 10, color: Colors.white),
               ),
             ),

@@ -14,8 +14,12 @@
 -dontwarn okhttp3.**
 -dontwarn io.ktor.**
 
-# Sqflite & SQLite
--keep class com.tekartik.sqflite.** { *; }
+# flutter_local_notifications — zamanlanmış bildirim verisi Gson ile
+# (de)serileştirilir, R8 bu alanları isim değişikliğine uğratırsa hatırlatıcılar
+# bozulur (bkz. görev 10 — takvim hatırlatıcıları).
+-keep class com.dexterous.** { *; }
+-keep class com.google.gson.** { *; }
+-keepattributes *Annotation*
 
 # Cached Network Image & Glide
 -keep class com.bumptech.glide.** { *; }

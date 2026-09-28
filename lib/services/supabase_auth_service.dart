@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import '../models/auth_user_model.dart';
 import 'local_storage_service.dart';
@@ -12,7 +13,11 @@ class SupabaseAuthException implements Exception {
 class SupabaseAuthService {
   static final _client = Supabase.instance.client;
 
-  static void _validateEduEmail(String email) {
+  // Not: bu iki doğrulama fonksiyonu bilerek public — pub Dart'ta bir
+  // library-private (`_`) üye başka bir dosyadaki (ör. test/) koddan asla
+  // çağrılamaz, `@visibleForTesting` bunu değiştirmez. Birim testi
+  // yazılabilmesi için (bkz. kontrol.md Bölüm 30.1) public yapıldı.
+  static void validateEduEmail(String email) {
     final parts = email.split('@');
     if (parts.length != 2 || parts[0].isEmpty || parts[1].isEmpty) {
       throw const SupabaseAuthException('Geçerli bir e-posta adresi giriniz.');
@@ -25,7 +30,7 @@ class SupabaseAuthService {
     }
   }
 
-  static void _validatePassword(String password) {
+  static void validatePassword(String password) {
     if (password.length < 8) {
       throw const SupabaseAuthException('Şifre en az 8 karakter olmalıdır.');
     }
@@ -41,16 +46,26 @@ class SupabaseAuthService {
 
   static String _mapError(Object e) {
     final msg = e.toString().toLowerCase();
+    // Not: "invalid credentials" ve "email not confirmed" bilerek AYNI mesajı
+    // döndürür — aksi halde bu iki durum arasındaki fark, bir e-postanın
+    // sistemde kayıtlı olup olmadığını dışarıya sızdırır (enumeration).
     if (msg.contains('invalid login credentials') ||
-        msg.contains('invalid email or password')) {
-      return 'E-posta veya şifre hatalı.';
-    }
-    if (msg.contains('email not confirmed')) {
-      return 'E-posta adresinizi doğrulamanız gerekiyor. Lütfen gelen kutunuzu kontrol edin.';
+        msg.contains('invalid email or password') ||
+        msg.contains('email not confirmed')) {
+      return 'E-posta veya şifre hatalı, ya da hesabınız henüz doğrulanmamış olabilir. '
+          'Doğrulama e-postası gönderildiyse gelen kutunuzu kontrol edin.';
     }
     if (msg.contains('user already registered') ||
         msg.contains('already been registered')) {
-      return 'Bu e-posta adresi zaten kayıtlı.';
+      // Not: "zaten kayıtlı" gibi net bir mesaj yerine bilerek kayıt başarılı
+      // akışıyla AYNI genel mesaj döndürülüyor — aksi halde bu mesaj bir
+      // e-postanın sistemde kayıtlı olup olmadığını dışarıya sızdırır
+      // (enumeration). "Kayıt başarılı" öneki register_screen.dart'ta
+      // doğrulama dialog'unu tetikliyor (bkz. _showEmailVerificationDialog).
+      return 'Kayıt başarılı! Eğer bu e-posta adresiyle daha önce hesap '
+          'oluşturmadıysanız, gelen kutunuzu kontrol edip doğrulama '
+          'bağlantısına tıklayın. Zaten bir hesabınız varsa doğrudan giriş '
+          'yapmayı deneyebilirsiniz.';
     }
     if (msg.contains('password should be at least')) {
       return 'Şifre en az 8 karakter olmalıdır.';
@@ -80,8 +95,8 @@ class SupabaseAuthService {
     String? grade,
   }) async {
     try {
-      _validateEduEmail(email);
-      _validatePassword(password);
+      validateEduEmail(email);
+      validatePassword(password);
       final res = await _client.auth.signUp(email: email, password: password);
 
       if (res.user == null) {
@@ -160,7 +175,11 @@ class SupabaseAuthService {
           'badge_id': badge['id'],
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      // İlk rozet ikincil bir yan etki — kayıt akışını engellememesi için
+      // yutuluyor, yalnızca gözlemlenebilir olsun diye logluyoruz.
+      debugPrint('İlk rozet verilemedi: $e');
+    }
   }
 
   /// Oturum açan kullanıcıyı cihaza önbelleğe alır (çevrimdışı açılış için).
@@ -176,7 +195,7 @@ class SupabaseAuthService {
     required String password,
   }) async {
     try {
-      _validateEduEmail(email);
+      validateEduEmail(email);
       final res = await _client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -257,6 +276,14 @@ class SupabaseAuthService {
       if (res.user == null) {
         throw const SupabaseAuthException('Şifre güncellenemedi.');
       }
+      // Şifre değişince diğer cihaz/oturumlardaki eski refresh token'lar
+      // geçersiz kılınır (bkz. kontrol.md Bölüm 4.9). Bu çağrı başarısız olsa
+      // bile şifre zaten güncellendiği için kullanıcıya hata gösterilmez.
+      try {
+        await _client.auth.signOut(scope: SignOutScope.others);
+      } catch (e) {
+        if (kDebugMode) debugPrint('signOut(others) başarısız: $e');
+      }
     } catch (e) {
       if (e is SupabaseAuthException) rethrow;
       throw SupabaseAuthException(_mapError(e));
@@ -266,7 +293,7 @@ class SupabaseAuthService {
   static Future<void> resetPassword(String email) async {
     try {
       // Öğrenci e-posta doğrulaması
-      _validateEduEmail(email);
+      validateEduEmail(email);
       await _client.auth.resetPasswordForEmail(email);
     } catch (e) {
       if (e is SupabaseAuthException) rethrow;

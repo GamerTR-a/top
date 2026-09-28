@@ -22,10 +22,15 @@ begin
     raise exception 'Not authenticated';
   end if;
 
-  -- CASCADE yoksa ilişkili verileri burada elle silin, örn.:
-  -- delete from public.user_badges where user_id = uid;
-  -- delete from public.posts       where author_id = uid;
-  -- delete from public.profiles    where id = uid;
+  -- Güvenlik ağı: public.profiles.id -> auth.users(id) ON DELETE CASCADE
+  -- olsa da (bkz. supabase_schema.sql), canlı ortamda hangi kurulum
+  -- dosyasının çalıştığı belirsiz olabileceğinden buradan da açıkça
+  -- silinir. profiles.id'ye ON DELETE CASCADE ile bağlı tüm alt tablolar
+  -- (posts, community_members, user_badges, notifications,
+  -- event_registrations, post_ratings, post_reports, calendar_notes,
+  -- fcm_tokens, community_messages, post_supports vb.) bu satırla
+  -- birlikte temizlenir — auth.users satırı zaten silinmeden önce.
+  delete from public.profiles where id = uid;
 
   delete from auth.users where id = uid;
 end;

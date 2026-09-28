@@ -1,18 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/auth_user_model.dart';
-import '../models/discount_model.dart';
+import '../models/news_model.dart';
 import '../models/post_model.dart';
 import '../services/supabase_data_service.dart';
-import '../services/notification_service.dart';
 import '../services/socket_service.dart';
-import '../widgets/discount_carousel.dart';
+import '../services/connectivity_service.dart';
+import '../widgets/category_button.dart';
+import '../widgets/news_bulletin_carousel.dart';
 import '../widgets/post_card.dart';
 import '../widgets/post_card_skeleton.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
 import '../theme/app_theme.dart';
-import 'notifications_screen.dart';
+import 'notification_center_screen.dart';
 import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -29,20 +30,113 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _isLoading = true;
   String? _errorMsg;
-  List<DiscountModel> _kuponlar = [];
   List<PostModel> _gonderiler = [];
   List<Map<String, dynamic>> _etkinlikler = [];
+  List<NewsModel> _haberler = [];
 
   static const int _haftalikDestekIzni = 2;
+  static const int _postsPerPage = 15;
   int _kullanilanDestek = 0;
   Set<int> _supportedPostIds = {};
+  Map<int, int> _myRatings = {};
   StreamSubscription<Map<String, dynamic>>? _socketSub;
+
+  // Sonsuz kaydırma (bkz. kontrol.md Bölüm 16.13 — servis sayfalamayı zaten
+  // destekliyordu ama bu ekran hep yalnızca ilk 15 gönderiyi gösteriyordu).
+  final ScrollController _scrollController = ScrollController();
+  int _page = 1;
+  bool _hasMorePosts = true;
+  bool _loadingMore = false;
+
+  int _unreadNotifCount = 0;
+
+  // Görev 8: Akış (kronolojik) / Konuya göre (kategori) görünümü.
+  bool _byCategory = false;
+  String? _selectedCategory;
+
+  /// Gönderilerde fiilen bulunan kategoriler — topluluklar tablosundaki
+  /// `category` sütunundan gelir (bkz. topluluk.md seed script'i).
+  List<String> get _availableCategories {
+    final set = <String>{};
+    for (final p in _gonderiler) {
+      if (p.kategori.isNotEmpty) set.add(p.kategori);
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  List<PostModel> get _visiblePosts {
+    if (!_byCategory) return _gonderiler;
+    if (_selectedCategory == null) return _gonderiler;
+    return _gonderiler.where((p) => p.kategori == _selectedCategory).toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _loadData();
     _listenToSocket();
+    _loadUnreadCount();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_hasMorePosts || _loadingMore || _byCategory) return;
+    // Sona yaklaşınca (son 300px) bir sonraki sayfayı yükle.
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
+      _loadMorePosts();
+    }
+  }
+
+  Future<void> _loadMorePosts() async {
+    _loadingMore = true;
+    try {
+      final nextPage = _page + 1;
+      final more = await _dataService.getGonderiler(
+        page: nextPage,
+        limit: _postsPerPage,
+      );
+      if (!mounted) return;
+      final enriched = more
+          .map(
+            (p) => p.copyWith(
+              isSupportedByMe: _supportedPostIds.contains(p.id),
+              myRating: _myRatings[p.id],
+            ),
+          )
+          .toList();
+      setState(() {
+        _gonderiler = [..._gonderiler, ...enriched];
+        _page = nextPage;
+        _hasMorePosts = more.length >= _postsPerPage;
+      });
+    } catch (e) {
+      debugPrint('[Home] Sonraki sayfa yüklenemedi: $e');
+      // Sessizce başarısız olur — kullanıcı scroll'a devam ederse tekrar denenir.
+    } finally {
+      _loadingMore = false;
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    final uid = widget.currentUser?.id;
+    if (uid == null) return;
+    final count = await _dataService.getUnreadNotificationCount(uid);
+    if (mounted) setState(() => _unreadNotifCount = count);
+  }
+
+  Future<void> _openNotificationCenter() async {
+    final user = widget.currentUser;
+    if (user == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NotificationCenterScreen(currentUser: user),
+      ),
+    );
+    // Bildirim merkezinde okundu işaretlenmiş olabilir — rozeti güncelle.
+    _loadUnreadCount();
   }
 
   void _listenToSocket() {
@@ -63,6 +157,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _socketSub?.cancel();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -77,16 +173,16 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Önbellekte veri varsa anında gösterir; varsa true döner (skeleton atlanır).
   bool _applyCachedLists() {
     final posts = _dataService.getCachedGonderiler();
-    final kuponlar = _dataService.getCachedKuponlar();
     final etkinlikler = _dataService.getCachedUpcomingEvents();
-    if (posts.isEmpty && kuponlar.isEmpty && etkinlikler.isEmpty) {
+    final haberler = _dataService.getCachedNews();
+    if (posts.isEmpty && etkinlikler.isEmpty && haberler.isEmpty) {
       return false;
     }
     if (!mounted) return false;
     setState(() {
       if (posts.isNotEmpty) _gonderiler = posts;
-      if (kuponlar.isNotEmpty) _kuponlar = kuponlar;
       if (etkinlikler.isNotEmpty) _etkinlikler = etkinlikler;
+      if (haberler.isNotEmpty) _haberler = haberler;
       _isLoading = false;
       _errorMsg = null;
     });
@@ -104,8 +200,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     try {
       final results = await Future.wait([
-        _dataService.getKuponlar(),
-        _dataService.getGonderiler(),
+        // Ana içerik akışı — geçici bir ağ hatasında hemen "yüklenemedi"
+        // göstermek yerine üstel geri çekilmeyle 3 kez denenir (bkz.
+        // kontrol.md Bölüm 16.4/16.6).
+        retryWithBackoff(
+          () => _dataService.getGonderiler(page: 1, limit: _postsPerPage),
+        ),
         _dataService.getSupportStatus().catchError((e) {
           debugPrint('[Home] Destek durumu alınamadı: $e');
           return <String, dynamic>{};
@@ -118,10 +218,14 @@ class _HomeScreenState extends State<HomeScreen> {
           debugPrint('[Home] Puanlarım alınamadı: $e');
           return <int, int>{};
         }),
+        _dataService.getNews().catchError((e) {
+          debugPrint('[Home] Haberler alınamadı: $e');
+          return <NewsModel>[];
+        }),
       ]);
-      final posts = results[1] as List<PostModel>;
-      final myRatings = results[4] as Map<int, int>;
-      final statusData = results[2] as Map<String, dynamic>;
+      final posts = results[0] as List<PostModel>;
+      final myRatings = results[3] as Map<int, int>;
+      final statusData = results[1] as Map<String, dynamic>;
       final supported =
           (statusData['supportedPostIds'] as List?)
               ?.map((e) => (e as num).toInt())
@@ -138,11 +242,14 @@ class _HomeScreenState extends State<HomeScreen> {
           .toList();
       if (!mounted) return;
       setState(() {
-        _kuponlar = results[0] as List<DiscountModel>;
         _gonderiler = updatedPosts;
-        _etkinlikler = results[3] as List<Map<String, dynamic>>;
+        _etkinlikler = results[2] as List<Map<String, dynamic>>;
+        _haberler = results[4] as List<NewsModel>;
         _kullanilanDestek = used;
         _supportedPostIds = supported;
+        _myRatings = myRatings;
+        _page = 1;
+        _hasMorePosts = posts.length >= _postsPerPage;
         _isLoading = false;
       });
     } catch (e) {
@@ -208,12 +315,6 @@ class _HomeScreenState extends State<HomeScreen> {
         '${post.toplulukAdi}\'na destek verdin! ❤️',
         isError: false,
       );
-      notificationService.add(
-        title: 'Destek Verildi ❤️',
-        body: '${post.toplulukAdi} topluluğuna destek verdin.',
-        icon: Icons.favorite_outline,
-        color: const Color(0xFFFF5252),
-      );
       try {
         await _dataService.supportPost(post.id);
       } catch (_) {
@@ -258,12 +359,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ];
           });
           if (firstTime) {
-            notificationService.add(
-              title: '10 XP Kazandın! 🎮',
-              body: '${post.toplulukAdi} gönderisini $newRating ⭐ ile '
-                  'değerlendirdin.',
-              icon: Icons.star_outline,
-              color: const Color(0xFFFFD700),
+            _showNotification(
+              '10 XP Kazandın! 🎮 ${post.toplulukAdi} gönderisini değerlendirdin.',
+              isError: false,
             );
           }
         })
@@ -363,6 +461,72 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Ada';
   }
 
+  /// Görev 8: "Akış" (kronolojik, filtresiz) / "Konuya göre" (kategori
+  /// çipleriyle filtreli) geçişi. Kategoriler `communities.category`
+  /// sütunundan gelir — bkz. topluluk.md seed script'i.
+  Widget _buildFeedFilterBar(AppTheme theme) {
+    final w = MediaQuery.of(context).size.width;
+    final categories = _availableCategories;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: w * 0.04),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _FeedModeTab(
+                  label: 'Akış',
+                  isActive: !_byCategory,
+                  theme: theme,
+                  onTap: () => setState(() => _byCategory = false),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FeedModeTab(
+                  label: 'Konuya Göre',
+                  isActive: _byCategory,
+                  theme: theme,
+                  onTap: () => setState(() => _byCategory = true),
+                ),
+              ),
+            ],
+          ),
+          if (_byCategory) ...[
+            const SizedBox(height: 10),
+            if (categories.isEmpty)
+              Text(
+                'Kategorili gönderi bulunamadı.',
+                style: TextStyle(color: theme.textMuted, fontSize: 12),
+              )
+            else
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    CategoryButton(
+                      title: 'Tümü',
+                      isSelected: _selectedCategory == null,
+                      onTap: () => setState(() => _selectedCategory = null),
+                    ),
+                    for (final c in categories)
+                      CategoryButton(
+                        title: c,
+                        isSelected: _selectedCategory == c,
+                        onTap: () => setState(() => _selectedCategory = c),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<AppTheme>(
@@ -385,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? ListView.builder(
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: 4,
-                      itemBuilder: (_, _) => const PostCardSkeleton(),
+                      itemBuilder: (context, index) => const PostCardSkeleton(),
                     )
                   : _errorMsg != null
                   ? Center(
@@ -427,10 +591,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       backgroundColor: theme.surface,
                       onRefresh: _loadData,
                       child: CustomScrollView(
+                        controller: _scrollController,
                         physics: const BouncingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
                         slivers: [
+                          if (_haberler.isNotEmpty)
+                            SliverToBoxAdapter(
+                              child: NewsBulletinCarousel(news: _haberler),
+                            ),
                           SliverToBoxAdapter(
                             child: Padding(
                               padding: EdgeInsets.only(
@@ -477,81 +646,61 @@ class _HomeScreenState extends State<HomeScreen> {
                                       ],
                                     ),
                                   ),
-                                  ValueListenableBuilder<List<AppNotification>>(
-                                    valueListenable:
-                                        notificationService.notifications,
-                                    builder: (ctx, notifs, _) {
-                                      final unread =
-                                          notifs.where((n) => !n.isRead).length;
-                                      return Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          IconButton(
-                                            onPressed: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      const NotificationsScreen(),
-                                                ),
-                                              );
-                                            },
-                                            icon: Icon(
-                                              Icons.notifications_outlined,
-                                              color: theme.textColor,
-                                              size: 24,
+                                  Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      IconButton(
+                                        onPressed: _openNotificationCenter,
+                                        icon: Icon(
+                                          Icons.notifications_outlined,
+                                          color: theme.textColor,
+                                          size: 24,
+                                        ),
+                                        tooltip: 'Bildirimler',
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: theme.isDark
+                                              ? theme.surface.withValues(
+                                                  alpha: 0.6,
+                                                )
+                                              : theme.surface,
+                                          padding: const EdgeInsets.all(10),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(16),
+                                            side: BorderSide(
+                                              color: theme.isDark
+                                                  ? theme.primary
+                                                      .withValues(alpha: 0.3)
+                                                  : const Color(0xFFE2E8F0),
                                             ),
-                                            tooltip: 'Bildirimler',
-                                            style: IconButton.styleFrom(
-                                              backgroundColor: theme.isDark
-                                                  ? theme.surface.withValues(
-                                                      alpha: 0.6,
-                                                    )
-                                                  : theme.surface,
-                                              padding: const EdgeInsets.all(10),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                                side: BorderSide(
-                                                  color: theme.isDark
-                                                      ? theme.primary
-                                                          .withValues(alpha: 0.3)
-                                                      : const Color(0xFFE2E8F0),
-                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_unreadNotifCount > 0)
+                                        Positioned(
+                                          top: -2,
+                                          right: -2,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(5),
+                                            decoration: BoxDecoration(
+                                              color: theme.error,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Text(
+                                              '$_unreadNotifCount',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
-                                          if (unread > 0)
-                                            Positioned(
-                                              top: -2,
-                                              right: -2,
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.all(5),
-                                                decoration: BoxDecoration(
-                                                  color: theme.error,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Text(
-                                                  '$unread',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      );
-                                    },
+                                        ),
+                                    ],
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                          SliverToBoxAdapter(
-                            child: DiscountCarousel(kuponlar: _kuponlar),
                           ),
                           if (_etkinlikler.isNotEmpty)
                             SliverToBoxAdapter(
@@ -612,8 +761,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
+                          SliverToBoxAdapter(
+                            child: _buildFeedFilterBar(theme),
+                          ),
                           // Sosyal Akış (Gönderiler)
-                          if (_gonderiler.isEmpty)
+                          if (_visiblePosts.isEmpty && _byCategory)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 32,
+                                  horizontal: 32,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Bu kategoride henüz gönderi yok.',
+                                    style: TextStyle(
+                                      color: theme.textMuted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else if (_gonderiler.isEmpty)
                             SliverToBoxAdapter(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
@@ -660,14 +830,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                 context,
                                 index,
                               ) {
+                                final post = _visiblePosts[index];
                                 return PostCard(
-                                  post: _gonderiler[index],
+                                  key: ValueKey(post.id),
+                                  post: post,
                                   onSupportTap: (post) =>
                                       _handleSupportTap(post),
                                   onRatingChanged: _handleRatingChanged,
                                   onReport: _handleReport,
                                 );
-                              }, childCount: _gonderiler.length),
+                              }, childCount: _visiblePosts.length),
+                            ),
+                          if (!_byCategory && _hasMorePosts)
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                child: Center(
+                                  child: SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: theme.primary.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           const SliverToBoxAdapter(child: SizedBox(height: 32)),
                         ],
@@ -677,6 +865,57 @@ class _HomeScreenState extends State<HomeScreen> {
           ), // closes AnimatedThemeBackground (body)
         ); // closes Scaffold
       },
+    );
+  }
+}
+
+// ── Akış / Konuya Göre Sekme Butonu ─────────────────────────────────────────
+
+class _FeedModeTab extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final AppTheme theme;
+  final VoidCallback onTap;
+
+  const _FeedModeTab({
+    required this.label,
+    required this.isActive,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isActive
+              ? theme.primary
+              : (theme.isDark
+                  ? theme.surface.withValues(alpha: 0.5)
+                  : theme.surface),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isActive
+                ? theme.primary
+                : (theme.isDark
+                    ? theme.textMuted.withValues(alpha: 0.25)
+                    : const Color(0xFFE2E8F0)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : theme.textMuted,
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ),
     );
   }
 }
