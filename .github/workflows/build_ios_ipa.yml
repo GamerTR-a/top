@@ -85,7 +85,7 @@ jobs:
           fi
 
       - name: IPA dosyasini artifact olarak yukle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: newgenc-ipa
           path: build/ios/ipa/NevGenc.ipa
