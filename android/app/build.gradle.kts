@@ -102,5 +102,5 @@ flutter {
 
 dependencies {
     // flutter_local_notifications için zorunlu (bkz. compileOptions yorumu).
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
