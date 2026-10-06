@@ -13,6 +13,7 @@ import 'screens/calendar_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/nev_plus_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 import 'theme/app_theme.dart';
 import 'models/auth_user_model.dart';
 import 'services/supabase_auth_service.dart';
@@ -338,6 +339,16 @@ class _AuthGateState extends State<AuthGate> {
     }
     if (_currentUser == null) {
       return LoginScreen(onLoginSuccess: _onLogin);
+    }
+    // Kullanım şartları (topluluk kuralları) onaylanmadan içerik gösterilmez
+    // — App Store Kural 1.2.
+    if (!(LocalStorageService.instance?.isPrivacyPolicyAccepted ?? false)) {
+      return PrivacyPolicyScreen(
+        isFirstTime: true,
+        onAccepted: () {
+          if (mounted) setState(() {});
+        },
+      );
     }
     return MainScaffold(user: _currentUser!, onLogout: _onLogout);
   }

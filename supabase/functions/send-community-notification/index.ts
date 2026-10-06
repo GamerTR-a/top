@@ -28,6 +28,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ALLOWED_ORIGIN = Deno.env.get("ALLOWED_ORIGIN") ?? "https://nevgenc.app";
+const CHAIRMAN_DAILY_LIMIT = 10;
 const CORS = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -131,6 +132,7 @@ async function sendToToken(
             notification: { title, body },
             data: { type },
             android: { notification: { channel_id: "nevgenc_general" } },
+            apns: { payload: { aps: { sound: "default" } } },
           },
         }),
       },
@@ -301,10 +303,20 @@ serve(async (req) => {
         })),
       );
       if (broadcastErr) {
-        return json({ error: `Bildirimler kaydedilemedi: ${broadcastErr}` }, 500);
+        console.error("[send-community-notification] broadcast insert:", broadcastErr);
+        return json({ error: "Bildirimler kaydedilemedi. Lütfen tekrar deneyin." }, 500);
       }
-      const broadcastPush = await sendPushes(admin, null, title, body, "announcement");
-      return json({ ok: true, sent_count: allIds.length, push_sent: broadcastPush });
+      // Tüm token'lara push, yanıt döndükten sonra arka planda sürer: büyük
+      // kitlede istek zaman aşımına düşüp admin'in duyuruyu yeniden göndermesi
+      // (herkese çift bildirim) önlenir. Uygulama-içi kayıtlar zaten yazıldı.
+      const pushJob = sendPushes(admin, null, title, body, "announcement");
+      // deno-lint-ignore no-explicit-any
+      const runtime = (globalThis as any).EdgeRuntime;
+      if (runtime?.waitUntil) {
+        runtime.waitUntil(pushJob);
+        return json({ ok: true, sent_count: allIds.length, push_sent: null, push_queued: true });
+      }
+      return json({ ok: true, sent_count: allIds.length, push_sent: await pushJob });
     }
 
     // ── 3. Yetkilendirme: admin HERHANGİ topluluğa, başkan SADECE kendi
@@ -335,6 +347,27 @@ serve(async (req) => {
         { error: "Bu topluluğa bildirim gönderme yetkiniz yok." },
         403,
       );
+    }
+
+    // ── 3b. Hız sınırı: başkan 24 saatte en fazla CHAIRMAN_DAILY_LIMIT
+    //     bildirim gönderebilir (ele geçirilmiş hesapla üyelere spam önlenir) ─
+    if (!isAdmin) {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count, error: countErr } = await admin
+        .from("community_notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("sender_id", user.id)
+        .gte("created_at", since);
+      if (countErr) {
+        console.error("[send-community-notification] rate limit check:", countErr);
+        return json({ error: "Bildirim gönderilemedi. Lütfen tekrar deneyin." }, 500);
+      }
+      if ((count ?? 0) >= CHAIRMAN_DAILY_LIMIT) {
+        return json(
+          { error: `Günlük bildirim sınırına (${CHAIRMAN_DAILY_LIMIT}) ulaştınız. Yarın tekrar deneyin.` },
+          429,
+        );
+      }
     }
 
     // ── 4. Alıcıları belirle: gerçek topluluk üyeleriyle kesişim al ────────
@@ -373,7 +406,8 @@ serve(async (req) => {
     }));
     const insertErr = await insertNotifications(admin, notificationRows);
     if (insertErr) {
-      return json({ error: `Bildirimler kaydedilemedi: ${insertErr}` }, 500);
+      console.error("[send-community-notification] insert:", insertErr);
+      return json({ error: "Bildirimler kaydedilemedi. Lütfen tekrar deneyin." }, 500);
     }
 
     // ── 6. Audit log ────────────────────────────────────────────────────────
@@ -400,6 +434,7 @@ serve(async (req) => {
       push_sent: pushSent,
     });
   } catch (err) {
-    return json({ error: String(err) }, 500);
+    console.error("[send-community-notification] unhandled error:", err);
+    return json({ error: "Beklenmeyen bir hata oluştu." }, 500);
   }
 });

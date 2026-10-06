@@ -51,11 +51,18 @@ class FcmService {
         sound: true,
       );
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        _token = await messaging.getToken();
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
         messaging.onTokenRefresh.listen(_onTokenRefresh);
-        // Token kaydı giriş sonrasına bırakılır (kullanıcı oturumu açık değilse crash olmaması için)
-        await _registerTokenSafely();
+        try {
+          _token = await _fetchToken(messaging);
+          // Token kaydı giriş sonrasına bırakılır (kullanıcı oturumu açık değilse crash olmaması için)
+          await _registerTokenSafely();
+        } catch (e) {
+          // Token alınamasa da ön plan/tıklama dinleyicileri aşağıda kurulmalı;
+          // token gelince onTokenRefresh ile kaydedilir.
+          debugPrint('[FCM] Token alınamadı: $e');
+        }
       } else {
         debugPrint(
           '[FCM] Bildirim izni verilmedi: ${settings.authorizationStatus}',
@@ -85,9 +92,30 @@ class FcmService {
     }
   }
 
+  /// iOS'ta APNs token'ı hazır olmadan getToken() `apns-token-not-set`
+  /// hatası verir — APNs token'ı birkaç saniye beklenir.
+  Future<String?> _fetchToken(FirebaseMessaging messaging) async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      String? apns;
+      for (var i = 0; i < 10 && apns == null; i++) {
+        apns = await messaging.getAPNSToken();
+        if (apns == null) await Future.delayed(const Duration(milliseconds: 500));
+      }
+      if (apns == null) return null;
+    }
+    return messaging.getToken();
+  }
+
   /// Kullanıcı giriş yaptıktan sonra çağrılarak token'ı Supabase'e kaydeder.
   Future<void> registerTokenForCurrentUser() async {
     if (!kPushEnabled) return;
+    if (_token == null) {
+      try {
+        _token = await _fetchToken(FirebaseMessaging.instance);
+      } catch (e) {
+        debugPrint('[FCM] Token alınamadı: $e');
+      }
+    }
     await _registerTokenSafely();
   }
 
@@ -106,6 +134,25 @@ class FcmService {
       debugPrint('[FCM] Token Supabase\'e kaydedildi.');
     } catch (e) {
       debugPrint('[FCM] Token kaydı başarısız: $e');
+    }
+  }
+
+  /// Çıkışta bu cihazın token kaydını siler; aksi halde cihaz, çıkış yapan
+  /// kullanıcının bildirimlerini almaya devam eder. Hata çıkışı engellemez.
+  Future<void> unregisterTokenForCurrentUser() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      var query = Supabase.instance.client
+          .from('fcm_tokens')
+          .delete()
+          .eq('user_id', user.id);
+      query = _token != null
+          ? query.eq('token', _token!)
+          : query.eq('platform', defaultTargetPlatform.name.toLowerCase());
+      await query.timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('[FCM] Token kaydı silinemedi: $e');
     }
   }
 

@@ -4,6 +4,7 @@ import '../models/auth_user_model.dart';
 import '../theme/app_theme.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
+import '../widgets/community_contact_section.dart';
 import '../services/joined_communities_service.dart';
 import '../services/supabase_data_service.dart';
 import 'community_chat_screen.dart';
@@ -208,6 +209,7 @@ class _CommunityDetailScreenState extends State<CommunityDetailScreen> {
                       color: theme.primary,
                       onTap: _openChat,
                     ),
+                    CommunityContactSection(topluluk: t, theme: theme),
                     const SizedBox(height: 24),
                     Text(
                       'Son Faaliyetler',
@@ -308,7 +310,7 @@ class _CommunityHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      t.ad,
+                      t.kisaltma.isEmpty ? t.ad : '${t.ad} (${t.kisaltma})',
                       style: TextStyle(
                         color: theme.textColor,
                         fontSize: 20,

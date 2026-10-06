@@ -31,7 +31,7 @@ class _NewsBulletinCarouselState extends State<NewsBulletinCarousel> {
   @override
   void initState() {
     super.initState();
-    _controller = PageController(viewportFraction: 0.92);
+    _controller = PageController();
     _startAutoAdvance();
   }
 
@@ -84,13 +84,15 @@ class _NewsBulletinCarouselState extends State<NewsBulletinCarousel> {
     return ValueListenableBuilder<AppTheme>(
       valueListenable: themeNotifier,
       builder: (context, theme, _) {
-        final screenWidth = MediaQuery.of(context).size.width;
-        final cardHeight = (screenWidth * 0.42).clamp(150.0, 190.0);
+        final gutter = MediaQuery.of(context).size.width * 0.04;
+        // Büyük yazı tipi ayarında iki satır başlık + özet sığsın.
+        final cardHeight =
+            MediaQuery.textScalerOf(context).scale(96).clamp(96.0, 132.0);
 
         return Padding(
-          padding: const EdgeInsets.only(top: 12, bottom: 4),
+          padding: const EdgeInsets.only(top: 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 height: cardHeight,
@@ -106,39 +108,32 @@ class _NewsBulletinCarouselState extends State<NewsBulletinCarousel> {
                     controller: _controller,
                     itemCount: widget.news.length,
                     onPageChanged: (i) => setState(() => _currentPage = i),
-                    itemBuilder: (context, index) {
-                      final item = widget.news[index];
-                      return Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: screenWidth * 0.02,
-                        ),
-                        child: _NewsCard(news: item, theme: theme),
-                      );
-                    },
+                    itemBuilder: (context, index) => Padding(
+                      padding: EdgeInsets.symmetric(horizontal: gutter),
+                      child: _NewsCard(news: widget.news[index], theme: theme),
+                    ),
                   ),
                 ),
               ),
               if (widget.news.length > 1) ...[
-                const SizedBox(height: 10),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(widget.news.length, (i) {
-                      final isActive = i == _currentPage;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: isActive ? 20 : 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? theme.primary
-                              : theme.textMuted.withValues(alpha: 0.35),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      );
-                    }),
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(widget.news.length, (i) {
+                    final isActive = i == _currentPage;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                      width: isActive ? 14 : 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? theme.primary
+                            : theme.textMuted.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    );
+                  }),
                 ),
               ],
             ],
@@ -155,104 +150,114 @@ class _NewsCard extends StatelessWidget {
 
   const _NewsCard({required this.news, required this.theme});
 
+  static const _months = [
+    'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
+    'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
+  ];
+
+  String get _dateLabel {
+    final d = news.publishedAt.toLocal();
+    return '${d.day} ${_months[d.month - 1]}';
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => NewsDetailScreen(news: news)),
+    final hasImage = news.imageUrl != null && news.imageUrl!.isNotEmpty;
+    final radius = BorderRadius.circular(16);
+
+    Widget placeholder() => Container(
+          color: theme.primary.withValues(alpha: 0.12),
+          alignment: Alignment.center,
+          child: Icon(Icons.article_outlined, color: theme.primary, size: 26),
         );
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (news.imageUrl != null && news.imageUrl!.isNotEmpty)
-              AppNetworkImage(
-                path: news.imageUrl!,
-                fit: BoxFit.cover,
-                fallback: () => Container(color: theme.primary.withValues(alpha: 0.25)),
-              )
-            else
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      theme.primary.withValues(alpha: 0.85),
-                      theme.secondary.withValues(alpha: 0.85),
-                    ],
-                  ),
+
+    return Material(
+      color: theme.isDark ? theme.surface.withValues(alpha: 0.7) : theme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(
+          color: theme.isDark
+              ? theme.textMuted.withValues(alpha: 0.18)
+              : const Color(0xFFE2E8F0),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => NewsDetailScreen(news: news)),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: hasImage
+                      ? AppNetworkImage(
+                          path: news.imageUrl!,
+                          fit: BoxFit.cover,
+                          fallback: placeholder,
+                        )
+                      : placeholder(),
                 ),
               ),
-            // Okunabilirlik için alttan karartma
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.65),
-                  ],
-                  stops: const [0.4, 1.0],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 14,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.campaign_rounded, color: Colors.white, size: 14),
-                      const SizedBox(width: 5),
-                      Text(
-                        'BÜLTEN',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    news.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
-                  ),
-                  if (news.summary.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                     Text(
-                      news.summary,
+                      'Haber · $_dateLabel',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 12,
+                        color: theme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      news.title,
+                      maxLines: news.summary.isEmpty ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.textColor,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                    if (news.summary.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        news.summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.textMuted,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.textMuted.withValues(alpha: 0.7),
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );

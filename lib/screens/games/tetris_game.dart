@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/animated_theme_background.dart';
 
-/// Klasik Tetris — 7 tetromino, döndürme, satır temizleme, skor & seviye.
+/// NevBlok (düşen blok oyunu) — 7 parça, döndürme, satır temizleme, skor & seviye.
 class TetrisGame extends StatefulWidget {
   const TetrisGame({super.key});
 
@@ -289,7 +289,7 @@ class _TetrisGameState extends State<TetrisGame> {
               tooltip: 'Geri',
             ),
             title: Text(
-              'Tetris',
+              'NevBlok',
               style: TextStyle(
                 color: theme.textColor,
                 fontWeight: FontWeight.bold,
@@ -331,7 +331,7 @@ class _TetrisGameState extends State<TetrisGame> {
             Icon(Icons.grid_view_rounded, color: _pieceColors[0], size: 64),
             const SizedBox(height: 14),
             Text(
-              'Tetris',
+              'NevBlok',
               style: TextStyle(
                 color: theme.textColor,
                 fontSize: 22,

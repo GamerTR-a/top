@@ -1,42 +1,40 @@
 import 'package:latlong2/latlong.dart';
 
-/// Kampüs Cepte POI kategorileri.
+/// Kampüs Cepte POI kategorileri. Adlar `campus_poi.json` ve `campus_pois`
+/// tablosundaki `category` değerleriyle aynıdır.
 enum PoiCategory {
-  dormitory, // yurt (özel + KYK)
-  busStop, // otobüs durağı
-  wifi, // wi-fi alanı
-  study, // ders çalışma / kütüphane
-  bikeRoute, // bisiklet rotası (polyline)
-  walkingRoute; // yürüyüş rotası (polyline)
+  dormitory('Yurt'),
+  busStop('Durak'),
+  faculty('Fakülte'),
+  study('Ders Çalışma'),
+  wifi('Wi-Fi'),
+  food('Yeme İçme'),
+  market('Market'),
+  health('Sağlık'),
+  sport('Spor'),
+  park('Park'),
+  worship('Cami'),
+  finance('Banka / ATM'),
+  culture('Kültür'),
+  walkingRoute('Yürüyüş'),
+  bikeRoute('Bisiklet');
 
-  static PoiCategory fromString(String s) {
-    switch (s) {
-      case 'dormitory':
-        return PoiCategory.dormitory;
-      case 'busStop':
-        return PoiCategory.busStop;
-      case 'wifi':
-        return PoiCategory.wifi;
-      case 'study':
-        return PoiCategory.study;
-      case 'bikeRoute':
-        return PoiCategory.bikeRoute;
-      case 'walkingRoute':
-        return PoiCategory.walkingRoute;
-      default:
-        return PoiCategory.study;
-    }
-  }
+  const PoiCategory(this.label);
 
   /// Kullanıcıya gösterilen kısa Türkçe etiket.
-  String get label => switch (this) {
-        PoiCategory.dormitory => 'Yurt',
-        PoiCategory.busStop => 'Durak',
-        PoiCategory.wifi => 'Wi-Fi',
-        PoiCategory.study => 'Ders Çalışma',
-        PoiCategory.bikeRoute => 'Bisiklet',
-        PoiCategory.walkingRoute => 'Yürüyüş',
-      };
+  final String label;
+
+  bool get isRouteCategory =>
+      this == PoiCategory.walkingRoute || this == PoiCategory.bikeRoute;
+
+  /// Bilinmeyen değer (yeni sürümde eklenmiş kategori) için null döner;
+  /// çağıran taraf o kaydı atlar.
+  static PoiCategory? tryParse(String s) {
+    for (final c in values) {
+      if (c.name == s) return c;
+    }
+    return null;
+  }
 }
 
 /// Kampüs Cepte POI — nokta (yurt, durak, wifi, ders) veya rota (polyline).
@@ -74,9 +72,10 @@ class CampusPoi {
       }
     }
     return CampusPoi(
-      id: json['id'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
       name: json['name'] as String? ?? '',
-      category: PoiCategory.fromString(json['category'] as String? ?? ''),
+      category: PoiCategory.tryParse(json['category'] as String? ?? '') ??
+          PoiCategory.study,
       lat: (json['lat'] as num?)?.toDouble() ?? 0,
       lng: (json['lng'] as num?)?.toDouble() ?? 0,
       description: json['description'] as String? ?? '',

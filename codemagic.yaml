@@ -10,6 +10,11 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: "e605816f-4dbc-41f6-a0cb-61d131147671"
         APP_STORE_CONNECT_KEY_IDENTIFIER: "8NRWS5B4GM"
     scripts:
+      - name: app_config.dart'ı ortam değişkenlerinden oluştur
+        script: |
+          # SUPABASE_URL ve SUPABASE_ANON_KEY, Codemagic > Environment variables
+          # altında tanımlı olmalı (dosya repo'da commit edilmiyor).
+          bash tool/ci_write_app_config.sh
       - name: Get Flutter packages
         script: |
           flutter pub get

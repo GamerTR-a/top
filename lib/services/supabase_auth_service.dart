@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import '../models/auth_user_model.dart';
+import 'fcm_service.dart';
 import 'local_storage_service.dart';
 
 class SupabaseAuthException implements Exception {
@@ -97,7 +98,18 @@ class SupabaseAuthService {
     try {
       validateEduEmail(email);
       validatePassword(password);
-      final res = await _client.auth.signUp(email: email, password: password);
+      // Profil bilgileri user_metadata'ya da yazılır: e-posta doğrulaması
+      // açıkken profil ilk girişte oluşturulur ve bu bilgiler oradan okunur.
+      final res = await _client.auth.signUp(
+        email: email,
+        password: password,
+        data: {
+          'name': name,
+          if (birthDate != null && birthDate.isNotEmpty) 'birth_date': birthDate,
+          if (department != null && department.isNotEmpty) 'department': department,
+          if (grade != null && grade.isNotEmpty) 'grade': grade,
+        },
+      );
 
       if (res.user == null) {
         throw const SupabaseAuthException(
@@ -110,7 +122,6 @@ class SupabaseAuthService {
         await _insertProfile(
           userId: res.user!.id,
           name: name,
-          birthDate: birthDate,
           department: department,
           grade: grade,
         );
@@ -143,7 +154,6 @@ class SupabaseAuthService {
   static Future<void> _insertProfile({
     required String userId,
     required String name,
-    String? birthDate,
     String? department, // Comma-separated string
     String? grade,
   }) async {
@@ -156,7 +166,6 @@ class SupabaseAuthService {
       'id': userId,
       'name': name,
       'role': 'student',
-      if (birthDate != null && birthDate.isNotEmpty) 'birth_date': birthDate,
       if (deptArray != null && deptArray.isNotEmpty) 'department': deptArray,
       if (grade != null && grade.isNotEmpty) 'grade': grade,
     });
@@ -213,9 +222,19 @@ class SupabaseAuthService {
 
       final AuthUser authUser;
       if (profile == null) {
+        final meta = res.user!.userMetadata ?? const {};
+        String? metaStr(String key) {
+          final v = meta[key];
+          return v is String && v.trim().isNotEmpty ? v.trim() : null;
+        }
+
         await _insertProfile(
           userId: res.user!.id,
-          name: res.user!.email?.split('@').first ?? 'Kullanıcı',
+          name: metaStr('name') ??
+              res.user!.email?.split('@').first ??
+              'Kullanıcı',
+          department: metaStr('department'),
+          grade: metaStr('grade'),
         );
         await _grantFirstBadge(res.user!.id);
         final newProfile = await _client
@@ -237,6 +256,8 @@ class SupabaseAuthService {
   }
 
   static Future<void> logout() async {
+    // Oturum kapanmadan önce: RLS, token satırını yalnızca sahibine sildirir.
+    await fcmService.unregisterTokenForCurrentUser();
     await _client.auth.signOut();
     try {
       final store = await LocalStorageService.getInstance();

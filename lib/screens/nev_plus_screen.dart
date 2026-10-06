@@ -16,21 +16,6 @@ class NevPlusScreen extends StatelessWidget {
 
   const NevPlusScreen({super.key, this.user});
 
-  void _showComingSoon(BuildContext context, String featureName, AppTheme theme) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$featureName yakında geliyor! 🚀',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: theme.secondary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   Widget _buildMenuItem(
     BuildContext context,
     AppTheme theme,
@@ -188,14 +173,6 @@ class NevPlusScreen extends StatelessWidget {
                         ),
                       );
                     },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    theme,
-                    'Kitap Okuma Kulübü',
-                    Icons.menu_book,
-                    const Color(0xFFFFD700),
-                    onTap: () => _showComingSoon(context, 'Kitap Okuma Kulübü', theme),
                   ),
                   _buildMenuItem(
                     context,

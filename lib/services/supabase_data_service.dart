@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart' hide AuthUser;
 import '../models/auth_user_model.dart';
 import '../models/topluluk.dart';
@@ -12,6 +10,7 @@ import '../models/user_profile_model.dart';
 import '../models/leaderboard_model.dart';
 import '../models/ticket_model.dart';
 import '../models/news_model.dart';
+import '../models/quiz_question.dart';
 import '../models/job_listing_model.dart';
 import '../utils/file_validator.dart';
 import '../utils/image_sanitizer.dart';
@@ -119,6 +118,7 @@ class SupabaseDataService {
           .from('posts')
           .select()
           .eq('community_id', communityId)
+          .or(_visiblePostFilter)
           .order('created_at', ascending: false)
           .limit(10);
       final events = await _db
@@ -216,6 +216,179 @@ class SupabaseDataService {
       updates['logo_path'] = logoPath;
     }
     await _db.from('communities').update(updates).eq('id', communityId);
+  }
+
+  /// Tek bir topluluğun güncel kaydını döndürür.
+  Future<Topluluk?> getCommunityById(int communityId) async {
+    try {
+      final res = await _db
+          .from('communities')
+          .select()
+          .eq('id', communityId)
+          .maybeSingle();
+      return res == null ? null : Topluluk.fromApiJson(res);
+    } catch (e) {
+      debugPrint('[SupabaseDataService] getCommunityById failed: $e');
+      return null;
+    }
+  }
+
+  /// Başkan/admin: topluluğun tanıtım ve iletişim bilgilerini günceller.
+  /// Yetki sunucuda zorlanır (RLS: yalnızca o topluluğun başkanı veya admin);
+  /// puan, üye sayısı, kategori ve başkan ataması başkan tarafından değişmez.
+  Future<void> updateCommunityProfile({
+    required int communityId,
+    required String name,
+    required String shortName,
+    required String description,
+    required String chairmanName,
+    required String contactEmail,
+    required String contactPhone,
+    String? logoPath,
+  }) async {
+    if (name.length < 2 || name.length > 120) {
+      throw StateError('Topluluk adı 2-120 karakter olmalıdır.');
+    }
+    if (shortName.length > 20) {
+      throw StateError('Kısaltma en fazla 20 karakter olabilir.');
+    }
+    if (description.length > 1000) {
+      throw StateError('Tanıtım en fazla 1000 karakter olabilir.');
+    }
+    if (chairmanName.length > 80) {
+      throw StateError('Başkan adı en fazla 80 karakter olabilir.');
+    }
+    if (contactEmail.isNotEmpty &&
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(contactEmail)) {
+      throw StateError('Geçerli bir e-posta adresi girin.');
+    }
+    if (contactPhone.isNotEmpty &&
+        !RegExp(r'^\+?[0-9 ()-]{7,30}$').hasMatch(contactPhone)) {
+      throw StateError('Geçerli bir telefon numarası girin.');
+    }
+    final updated = await _db
+        .from('communities')
+        .update({
+          'name': name,
+          'short_name': shortName.isEmpty ? null : shortName,
+          'description': description,
+          'chairman_name': chairmanName.isEmpty ? null : chairmanName,
+          'contact_email': contactEmail.isEmpty ? null : contactEmail,
+          'contact_phone': contactPhone.isEmpty ? null : contactPhone,
+          if (logoPath != null && logoPath.isNotEmpty) 'logo_path': logoPath,
+        })
+        .eq('id', communityId)
+        .select('id');
+    // RLS reddi hata fırlatmaz, 0 satır günceller.
+    if ((updated as List).isEmpty) {
+      throw StateError('Bu topluluğu düzenleme yetkiniz yok.');
+    }
+  }
+
+  /// Başkan/admin: bağlantıları topluca kaydeder; boş bırakılan platformun
+  /// kaydı silinir.
+  Future<void> saveCommunityLinks(
+    int communityId,
+    Map<String, String> links,
+  ) async {
+    for (final entry in links.entries) {
+      final url = entry.value.trim();
+      if (url.isEmpty) {
+        await removeCommunityLink(communityId, entry.key);
+      } else {
+        await setCommunityLink(communityId, entry.key, url);
+      }
+    }
+  }
+
+  // ── Uygulama ayarları (app_settings: herkes okur, admin yazar) ───────────────
+
+  Future<Map<String, String>> getAppSettings(List<String> keys) async {
+    final rows = await _db
+        .from('app_settings')
+        .select('key, value')
+        .inFilter('key', keys);
+    return {
+      for (final r in (rows as List))
+        (r as Map)['key'] as String: r['value'] as String? ?? '',
+    };
+  }
+
+  Future<void> setAppSettings(Map<String, String> values) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    final saved = await _db
+        .from('app_settings')
+        .upsert(
+          [
+            for (final e in values.entries)
+              {'key': e.key, 'value': e.value, 'updated_at': now},
+          ],
+          onConflict: 'key',
+        )
+        .select('key');
+    if ((saved as List).length != values.length) {
+      throw StateError('Ayarlar kaydedilemedi (admin yetkisi gerekir).');
+    }
+  }
+
+  // ── Kampüs Cepte: admin'in eklediği noktalar ────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getRemoteCampusPois() async {
+    final res = await _db
+        .from('campus_pois')
+        .select('id, name, category, lat, lng, description, address')
+        .order('name');
+    return List<Map<String, dynamic>>.from(res as List);
+  }
+
+  Future<void> addCampusPoi({
+    required String name,
+    required String category,
+    required double lat,
+    required double lng,
+    String description = '',
+    String address = '',
+  }) async {
+    await _db.from('campus_pois').insert({
+      'name': name,
+      'category': category,
+      'lat': lat,
+      'lng': lng,
+      'description': description,
+      'address': address,
+      'created_by': _uid,
+    });
+  }
+
+  Future<void> deleteCampusPoi(int id) async {
+    await _db.from('campus_pois').delete().eq('id', id);
+  }
+
+  // ── Kampüs Bilgi Yarışması: admin'in eklediği sorular ───────────────────────
+
+  Future<List<QuizQuestion>> getRemoteQuizQuestions() async {
+    final res = await _db
+        .from('quiz_questions')
+        .select('id, question, options, correct_index, category')
+        .order('id', ascending: false);
+    return (res as List)
+        .map((r) => QuizQuestion.tryFromApiJson(r as Map<String, dynamic>))
+        .whereType<QuizQuestion>()
+        .toList();
+  }
+
+  Future<void> addQuizQuestion(QuizQuestion q) async {
+    await _db.from('quiz_questions').insert({
+      'question': q.question,
+      'options': q.options,
+      'correct_index': q.correctIndex,
+      'category': q.category,
+      'created_by': _uid,
+    });
+  }
+
+  Future<void> deleteQuizQuestion(int id) async {
+    await _db.from('quiz_questions').delete().eq('id', id);
   }
 
   /// Topluluğu siler (sadece admin).
@@ -413,10 +586,14 @@ class SupabaseDataService {
   /// [limit]'ten AZ sayıda sonuç dönmesi, çağıran tarafın sonraki sayfa
   /// olmadığını anlaması için kullanılabilir (bkz. home_screen.dart sonsuz
   /// kaydırma — kontrol.md Bölüm 16.13).
+  /// Admin'in gizlediği (status='hidden') gönderiler akışta gösterilmez.
+  static const _visiblePostFilter = 'status.is.null,status.neq.hidden';
+
   Future<List<PostModel>> getGonderiler({int page = 1, int limit = 15}) async {
     final res = await _db
         .from('posts')
         .select('*, communities(category)')
+        .or(_visiblePostFilter)
         .order('created_at', ascending: false)
         .range((page - 1) * limit, page * limit - 1);
     final list = (res as List)
@@ -681,12 +858,11 @@ class SupabaseDataService {
 
   // ── Görsel yükleme (Supabase Storage → public URL) ──────────────────────────
 
-  /// Görsel yükler (MIME/boyut sınırı kontrollü). Öncelik Telegraph;
-  /// Telegraph başarısız olursa Supabase Storage'a düşer (fallback).
+  /// Görseli (MIME/boyut sınırı kontrollü) Supabase Storage'a yükler.
   ///
-  /// Yüklemeden önce EXIF meta verisi (özellikle GPS konumu) temizlenir —
-  /// Telegraph kalıcı/herkese açık bir üçüncü parti barındırma olduğundan
-  /// bu adım atlanmaz (bkz. güvenlik denetimi: "EXIF/GPS sızıntısı").
+  /// Yalnızca kendi depolamamız kullanılır: üçüncü parti barındırmadaki
+  /// görseller hesap silindiğinde kaldırılamaz. Yüklemeden önce EXIF meta
+  /// verisi (özellikle GPS konumu) temizlenir ve görsel küçültülür.
   Future<String> uploadPostImage(File file) async {
     final validation = await FileValidator.validateFile(file);
     if (!validation.isValid) {
@@ -694,39 +870,9 @@ class SupabaseDataService {
     }
 
     final sanitized = await ImageSanitizer.stripExifAndReencode(file);
-
-    try {
-      final url = await _uploadPostImageToTelegraph(sanitized);
-      if (url != null) return url;
-    } catch (e) {
-      debugPrint('[Upload] Telegraph failed, falling back to Supabase: $e');
-    }
     return _uploadPostImageToSupabase(sanitized);
   }
 
-  /// Telegraph'a yükler (POST https://api.telegra.ph/upload, multipart "file").
-  /// Başarısızsa null döner — 5MB üstü dosyada genellikle başarısız olur.
-  Future<String?> _uploadPostImageToTelegraph(File file) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('https://api.telegra.ph/upload'),
-    );
-    request.files.add(await http.MultipartFile.fromPath('file', file.path));
-    final streamed = await request
-        .send()
-        .timeout(const Duration(seconds: 20));
-    final body = await streamed.stream.bytesToString();
-    if (streamed.statusCode != 200) return null;
-    final decoded = jsonDecode(body) as Map<String, dynamic>;
-    if (decoded['ok'] != true) return null;
-    final result = decoded['result'] as List?;
-    if (result == null || result.isEmpty) return null;
-    final src = (result[0] as Map<String, dynamic>)['src'] as String?;
-    if (src == null || src.isEmpty) return null;
-    return 'https://telegra.ph$src';
-  }
-
-  /// Supabase Storage fallback (eski davranış).
   Future<String> _uploadPostImageToSupabase(File file) async {
     final uid = _uid;
     final name = file.path.split(RegExp(r'[\\/]')).last;
@@ -850,10 +996,17 @@ class SupabaseDataService {
           .where((u) => u.isNotEmpty)
           .toList();
 
-      final adSoyad = p['name'] as String? ?? 'Ahmet Safa Zengin';
-      final email = p['email'] as String? ?? '23010404022@subu.edu.tr';
-      final birthDate = p['birth_date'] as String? ?? '15.05.2002';
-      final bolum = departmentText(p['department']) ?? 'Bilişim Sistemleri Mühendisliği';
+      final adSoyad = p['name'] as String? ?? '';
+      final email = _db.auth.currentUser?.id == userId
+          ? (_db.auth.currentUser?.email ?? '')
+          : '';
+      // Doğum tarihi profiles'ta tutulmaz (tablo diğer kullanıcılara açık);
+      // yalnızca sahibinin okuyabildiği auth user_metadata'dan gelir.
+      final ownMeta = _db.auth.currentUser?.id == userId
+          ? _db.auth.currentUser?.userMetadata
+          : null;
+      final birthDate = ownMeta?['birth_date'] as String? ?? '';
+      final bolum = departmentText(p['department']) ?? '';
       final qrString = "NEVGENC KİMLİĞİ\nAd Soyad: $adSoyad\nE-posta: $email\nDoğum Tarihi: $birthDate\nBölüm: $bolum";
 
       return UserProfileModel(
@@ -861,7 +1014,7 @@ class SupabaseDataService {
         email: email,
         birthDate: birthDate,
         bolum: bolum,
-        sinif: p['grade'] as String? ?? '3. Sınıf',
+        sinif: p['grade'] as String? ?? '',
         profilFoto: p['profile_photo'] as String? ?? 'assets/gem.png',
         qrData: qrString,
         rozetler: rozetler,
@@ -1001,29 +1154,12 @@ class SupabaseDataService {
         );
       }).toList();
 
-      if (comList.isNotEmpty || stuList.isNotEmpty) {
-        return LeaderboardData(topluluklar: comList, uyeler: stuList);
-      }
+      return LeaderboardData(topluluklar: comList, uyeler: stuList);
     } catch (e) {
-      debugPrint('[SupabaseDataService] getLeaderboardData fallback: $e');
+      // Sahte/demo sıralama gösterilmez — ekran kendi hata durumunu gösterir.
+      debugPrint('[SupabaseDataService] getLeaderboardData failed: $e');
+      rethrow;
     }
-
-    return LeaderboardData(
-      topluluklar: [
-        RankingModel(siralama: 1, isim: 'Girişimci Mühendisler Topluluğu', gorsel: 'assets/gem.png', puan: 2450, trend: 'up'),
-        RankingModel(siralama: 2, isim: 'Bilişim Sistemleri Topluluğu', gorsel: 'assets/gem.png', puan: 2180, trend: 'up'),
-        RankingModel(siralama: 3, isim: 'Tarih Öğrenci Topluluğu', gorsel: 'assets/gem.png', puan: 1890, trend: 'stable'),
-        RankingModel(siralama: 4, isim: 'Damla Öğrenci Topluluğu', gorsel: 'assets/gem.png', puan: 1650, trend: 'down'),
-        RankingModel(siralama: 5, isim: 'IEEE SUBÜ Student Branch', gorsel: 'assets/gem.png', puan: 1420, trend: 'up'),
-      ],
-      uyeler: [
-        RankingModel(siralama: 1, isim: 'Ahmet Safa Zengin', gorsel: 'assets/gem.png', puan: 980, trend: 'up'),
-        RankingModel(siralama: 2, isim: 'Melik Mirza Çelik', gorsel: 'assets/gem.png', puan: 850, trend: 'up'),
-        RankingModel(siralama: 3, isim: 'İbrahim Gece', gorsel: 'assets/gem.png', puan: 790, trend: 'stable'),
-        RankingModel(siralama: 4, isim: 'Aygül Aladı', gorsel: 'assets/gem.png', puan: 710, trend: 'stable'),
-        RankingModel(siralama: 5, isim: 'Zeynep Yılmaz', gorsel: 'assets/gem.png', puan: 640, trend: 'down'),
-      ],
-    );
   }
 
   Future<void> registerFcmToken(
@@ -1298,52 +1434,6 @@ class SupabaseDataService {
       'totalPosts': (results[2] as dynamic).count ?? 0,
       'newUsersThisWeek': (results[3] as dynamic).count ?? 0,
     };
-  }
-
-  Future<void> updatePostRating(int postId, double rating) async {
-    final uid = _uid;
-    await Future.wait([
-      _db
-          .rpc(
-            'update_post_quality',
-            params: {'post_id': postId, 'new_score': rating},
-          )
-          .catchError((_) async {
-            final post = await _db
-                .from('posts')
-                .select('quality_score')
-                .eq('id', postId)
-                .single();
-            final current =
-                ((post as Map)['quality_score'] as num?)?.toDouble() ?? 0.0;
-            final updated = current == 0.0 ? rating : (current + rating) / 2.0;
-            await _db
-                .from('posts')
-                .update({'quality_score': updated})
-                .eq('id', postId);
-          }),
-      _db
-          .rpc('add_user_xp', params: {'user_id': uid, 'xp_amount': 10})
-          .catchError((_) async {
-            try {
-              final row = await _db
-                  .from('profiles')
-                  .select('xp')
-                  .eq('id', uid)
-                  .single();
-              final current = ((row as Map)['xp'] as num?)?.toInt() ?? 0;
-              await _db
-                  .from('profiles')
-                  .update({'xp': current + 10})
-                  .eq('id', uid);
-            } catch (e) {
-              // XP ödülü ikincil bir yan etki — birincil işlemi (destek/
-              // gönderi) engellememesi için yutuluyor, yalnızca gözlemlenebilir
-              // olsun diye logluyoruz.
-              debugPrint('XP fallback güncellemesi başarısız: $e');
-            }
-          }),
-    ]);
   }
 
   // ── Bildirimler (Notification Center) ────────────────────────────────────────

@@ -10,6 +10,7 @@ class PostCard extends StatefulWidget {
   final Function(PostModel) onSupportTap;
   final Function(PostModel, int) onRatingChanged;
   final Function(PostModel) onReport;
+  final Function(PostModel)? onBlock;
 
   const PostCard({
     super.key,
@@ -17,6 +18,7 @@ class PostCard extends StatefulWidget {
     required this.onSupportTap,
     required this.onRatingChanged,
     required this.onReport,
+    this.onBlock,
   });
 
   @override
@@ -221,9 +223,28 @@ class _PostCardState extends State<PostCard> {
                             ],
                           ),
                         ),
+                        if (widget.onBlock != null)
+                          PopupMenuItem(
+                            value: 'block',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.block_rounded,
+                                  size: 16,
+                                  color: theme.textMuted,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Topluluğu Engelle',
+                                  style: TextStyle(color: theme.textColor),
+                                ),
+                              ],
+                            ),
+                          ),
                       ],
                       onSelected: (value) {
                         if (value == 'report') widget.onReport(widget.post);
+                        if (value == 'block') widget.onBlock?.call(widget.post);
                       },
                     ),
                   ],

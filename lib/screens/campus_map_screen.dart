@@ -17,7 +17,6 @@ enum _GateStatus {
   permissionDenied,
   deniedForever,
   noGps,
-  outsideSakarya,
   ready,
 }
 
@@ -35,6 +34,10 @@ class _CampusMapScreenState extends State<CampusMapScreen>
   Position? _position;
   String? _adminArea;
   double _distanceToCampus = 0;
+  // Sakarya dışındaki kullanıcı (ör. App Review) haritayı yine görebilmeli —
+  // kilit yerine kapatılabilir bir bilgi bandı gösterilir.
+  bool _isOutsideSakarya = false;
+  bool _outsideBannerDismissed = false;
 
   final TextEditingController _searchCtrl = TextEditingController();
   final MapController _mapController = MapController();
@@ -144,9 +147,11 @@ class _CampusMapScreenState extends State<CampusMapScreen>
       if (!mounted) return;
       // Haritayı konum alınır alınmaz göster — OSM tile'ları yüklenmeye başlar.
       // Geofence kararı arka planda tek jeokodlama ile gelir (çift geocode yok);
-      // kullanıcı Sakarya dışındaysa ekran kilit ekranına geçer.
+      // kullanıcı Sakarya dışındaysa harita kampüs merkezinde kalır ve bilgi
+      // bandı gösterilir.
       setState(() {
         _position = pos;
+        _isOutsideSakarya = false;
         _status = _GateStatus.ready;
       });
       final check = await LocationService.sakaryaCheck(
@@ -161,13 +166,26 @@ class _CampusMapScreenState extends State<CampusMapScreen>
             pos.latitude,
             pos.longitude,
           );
-          _status = _GateStatus.outsideSakarya;
+          _isOutsideSakarya = true;
+          _outsideBannerDismissed = false;
         });
+        if (_mapReady) {
+          _mapController.move(LocationService.campusCenter, 15.5);
+        }
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _status = _GateStatus.noGps);
     }
+  }
+
+  /// Konum olmadan haritayı kampüs merkezinde açar (izin reddi / GPS yok).
+  void _browseWithoutLocation() {
+    setState(() {
+      _position = null;
+      _isOutsideSakarya = false;
+      _status = _GateStatus.ready;
+    });
   }
 
   // ------------------------------------------------------------------
@@ -176,12 +194,9 @@ class _CampusMapScreenState extends State<CampusMapScreen>
 
   bool _categoryMatches(CampusPoi p) {
     final c = _activeCategory;
-    if (c == null) return true;
-    // 'Rotalar' chip'i hem bisiklet hem yürüyüş rotasını gösterir.
-    if (c == PoiCategory.bikeRoute) {
-      return p.category == PoiCategory.bikeRoute ||
-          p.category == PoiCategory.walkingRoute;
-    }
+    // 'Tümü': yüzlerce yol parçası haritayı okunmaz kıldığı için rotalar
+    // yalnızca kendi filtreleri seçiliyken çizilir.
+    if (c == null) return !p.category.isRouteCategory;
     return p.category == c;
   }
 
@@ -199,20 +214,38 @@ class _CampusMapScreenState extends State<CampusMapScreen>
 
   Color _categoryColor(PoiCategory c) => switch (c) {
         PoiCategory.dormitory => const Color(0xFF6366F1),
-        PoiCategory.busStop => const Color(0xFFFFA726),
+        PoiCategory.busStop => const Color(0xFFFB8C00),
+        PoiCategory.faculty => const Color(0xFF1E88E5),
+        PoiCategory.study => const Color(0xFFF9A825),
         PoiCategory.wifi => const Color(0xFF00ACC1),
-        PoiCategory.study => const Color(0xFFFFB300),
-        PoiCategory.bikeRoute => const Color(0xFF4CAF50),
-        PoiCategory.walkingRoute => const Color(0xFF66BB6A),
+        PoiCategory.food => const Color(0xFFE64A19),
+        PoiCategory.market => const Color(0xFF8E24AA),
+        PoiCategory.health => const Color(0xFFE53935),
+        PoiCategory.sport => const Color(0xFF00897B),
+        PoiCategory.park => const Color(0xFF43A047),
+        PoiCategory.worship => const Color(0xFF5D4037),
+        PoiCategory.finance => const Color(0xFF546E7A),
+        PoiCategory.culture => const Color(0xFFD81B60),
+        PoiCategory.walkingRoute => const Color(0xFF2E7D32),
+        PoiCategory.bikeRoute => const Color(0xFF00838F),
       };
 
   IconData _categoryIcon(PoiCategory c) => switch (c) {
         PoiCategory.dormitory => Icons.apartment_rounded,
         PoiCategory.busStop => Icons.directions_bus_rounded,
-        PoiCategory.wifi => Icons.wifi_rounded,
+        PoiCategory.faculty => Icons.school_rounded,
         PoiCategory.study => Icons.menu_book_rounded,
-        PoiCategory.bikeRoute => Icons.directions_bike_rounded,
+        PoiCategory.wifi => Icons.wifi_rounded,
+        PoiCategory.food => Icons.restaurant_rounded,
+        PoiCategory.market => Icons.shopping_basket_rounded,
+        PoiCategory.health => Icons.local_pharmacy_rounded,
+        PoiCategory.sport => Icons.sports_soccer_rounded,
+        PoiCategory.park => Icons.park_rounded,
+        PoiCategory.worship => Icons.mosque_rounded,
+        PoiCategory.finance => Icons.atm_rounded,
+        PoiCategory.culture => Icons.theater_comedy_rounded,
         PoiCategory.walkingRoute => Icons.directions_walk_rounded,
+        PoiCategory.bikeRoute => Icons.directions_bike_rounded,
       };
 
   // ------------------------------------------------------------------
@@ -296,6 +329,8 @@ class _CampusMapScreenState extends State<CampusMapScreen>
           subtitle: 'Kampüs haritası için konum izninize ihtiyacımız var.',
           buttonLabel: 'İzin Ver',
           onPressed: _initLocation,
+          secondaryLabel: 'Haritayı konumsuz göster',
+          onSecondary: _browseWithoutLocation,
         );
       case _GateStatus.deniedForever:
         return _buildGate(
@@ -307,6 +342,8 @@ class _CampusMapScreenState extends State<CampusMapScreen>
               'Ayarlardan konum iznini açmalısınız, sonra geri gelip tekrar deneyin.',
           buttonLabel: 'Ayarları Aç',
           onPressed: () => Geolocator.openAppSettings(),
+          secondaryLabel: 'Haritayı konumsuz göster',
+          onSecondary: _browseWithoutLocation,
         );
       case _GateStatus.noGps:
         return _buildGate(
@@ -318,9 +355,9 @@ class _CampusMapScreenState extends State<CampusMapScreen>
               'Açık havada olun veya telefonunuzun konum servisinin açık olduğundan emin olun.',
           buttonLabel: 'Tekrar Dene',
           onPressed: _initLocation,
+          secondaryLabel: 'Haritayı konumsuz göster',
+          onSecondary: _browseWithoutLocation,
         );
-      case _GateStatus.outsideSakarya:
-        return _buildOutsideGate(theme);
       case _GateStatus.ready:
         return _buildMap(theme);
     }
@@ -334,6 +371,8 @@ class _CampusMapScreenState extends State<CampusMapScreen>
     required String subtitle,
     String? buttonLabel,
     VoidCallback? onPressed,
+    String? secondaryLabel,
+    VoidCallback? onSecondary,
   }) {
     return Center(
       child: SingleChildScrollView(
@@ -380,86 +419,46 @@ class _CampusMapScreenState extends State<CampusMapScreen>
                 ),
               ),
             ],
+            if (secondaryLabel != null && onSecondary != null) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: onSecondary,
+                child: Text(secondaryLabel,
+                    style: TextStyle(color: theme.primary)),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildOutsideGate(AppTheme theme) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildOutsideBanner(AppTheme theme) {
+    final where = _adminArea != null ? '$_adminArea · ' : '';
+    return Material(
+      color: theme.isDark ? theme.surface : Colors.white,
+      elevation: 3,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+        child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: theme.primary.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.primary.withValues(alpha: 0.4)),
-              ),
-              child: Icon(Icons.lock_outline_rounded,
-                  color: theme.primary, size: 40),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Kampüsten uzaktasın 📍',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: theme.textColor,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            Icon(Icons.info_outline_rounded, color: theme.primary, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '${where}Kampüsten ${_distanceToCampus.toStringAsFixed(1)} km '
+                'uzaktasın. Harita kampüs merkezinde gösteriliyor.',
+                style: TextStyle(color: theme.textColor, fontSize: 12.5, height: 1.3),
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Kampüs Cepte özelliği Sakarya sınırları içindeyken kullanılabilir.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: theme.textMuted, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            if (_adminArea != null)
-              _infoRow(theme, Icons.place_rounded, 'Konum: $_adminArea'),
-            _infoRow(
-              theme,
-              Icons.directions_rounded,
-              'Kampüse uzaklık: ${_distanceToCampus.toStringAsFixed(1)} km',
-            ),
-            const SizedBox(height: 22),
-            ElevatedButton.icon(
-              onPressed: _initLocation,
-              icon: const Icon(Icons.my_location_rounded, size: 18),
-              label: const Text('Konumu Yenile'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primary,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              ),
+            IconButton(
+              tooltip: 'Kapat',
+              icon: Icon(Icons.close_rounded, color: theme.textMuted, size: 18),
+              onPressed: () => setState(() => _outsideBannerDismissed = true),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _infoRow(AppTheme theme, IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 14, color: theme.textMuted),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              text,
-              style: TextStyle(color: theme.textColor, fontSize: 13),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -479,7 +478,14 @@ class _CampusMapScreenState extends State<CampusMapScreen>
           child: Stack(
             children: [
               Positioned.fill(child: _buildFlutterMap(theme)),
-              if (_mapReady && _position != null)
+              if (_isOutsideSakarya && !_outsideBannerDismissed)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  top: 8,
+                  child: _buildOutsideBanner(theme),
+                ),
+              if (_mapReady && _position != null && !_isOutsideSakarya)
                 Positioned(
                   right: 12,
                   bottom: 12,
@@ -531,13 +537,33 @@ class _CampusMapScreenState extends State<CampusMapScreen>
   }
 
   Widget _buildCategoryChips(AppTheme theme) {
+    const plural = {
+      PoiCategory.dormitory: 'Yurtlar',
+      PoiCategory.busStop: 'Duraklar',
+      PoiCategory.faculty: 'Fakülteler',
+      PoiCategory.walkingRoute: 'Yürüyüş Rotaları',
+      PoiCategory.bikeRoute: 'Bisiklet Yolları',
+    };
+    const order = [
+      PoiCategory.dormitory,
+      PoiCategory.busStop,
+      PoiCategory.walkingRoute,
+      PoiCategory.bikeRoute,
+      PoiCategory.faculty,
+      PoiCategory.study,
+      PoiCategory.wifi,
+      PoiCategory.food,
+      PoiCategory.market,
+      PoiCategory.health,
+      PoiCategory.sport,
+      PoiCategory.park,
+      PoiCategory.worship,
+      PoiCategory.finance,
+      PoiCategory.culture,
+    ];
     final chips = <(PoiCategory?, String, IconData)>[
       (null, 'Tümü', Icons.all_inclusive_rounded),
-      (PoiCategory.dormitory, 'Yurtlar', Icons.apartment_rounded),
-      (PoiCategory.busStop, 'Duraklar', Icons.directions_bus_rounded),
-      (PoiCategory.wifi, 'Wi-Fi', Icons.wifi_rounded),
-      (PoiCategory.study, 'Ders Çalışma', Icons.menu_book_rounded),
-      (PoiCategory.bikeRoute, 'Rotalar', Icons.route_rounded),
+      for (final c in order) (c, plural[c] ?? c.label, _categoryIcon(c)),
     ];
     return SizedBox(
       height: 40,
@@ -655,7 +681,7 @@ class _CampusMapScreenState extends State<CampusMapScreen>
         maxZoom: 19,
         onMapReady: () {
           _mapReady = true;
-          if (_position != null) {
+          if (_position != null && !_isOutsideSakarya) {
             _mapController.move(
               LatLng(_position!.latitude, _position!.longitude),
               16,

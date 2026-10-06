@@ -5,6 +5,7 @@ import '../models/news_model.dart';
 import '../models/post_model.dart';
 import '../services/supabase_data_service.dart';
 import '../services/socket_service.dart';
+import '../services/block_service.dart';
 import '../services/connectivity_service.dart';
 import '../widgets/category_button.dart';
 import '../widgets/news_bulletin_carousel.dart';
@@ -66,9 +67,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   List<PostModel> get _visiblePosts {
-    if (!_byCategory) return _gonderiler;
-    if (_selectedCategory == null) return _gonderiler;
-    return _gonderiler.where((p) => p.kategori == _selectedCategory).toList();
+    final blocks = BlockService.instance;
+    final posts = blocks.hasBlocks
+        ? _gonderiler.where((p) => !blocks.isBlocked(p)).toList()
+        : _gonderiler;
+    if (!_byCategory || _selectedCategory == null) return posts;
+    return posts.where((p) => p.kategori == _selectedCategory).toList();
+  }
+
+  void _onBlocksChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -78,6 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _listenToSocket();
     _loadUnreadCount();
     _scrollController.addListener(_onScroll);
+    BlockService.instance.changes.addListener(_onBlocksChanged);
+    BlockService.instance.filter(const []).then((_) => _onBlocksChanged());
   }
 
   void _onScroll() {
@@ -157,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _socketSub?.cancel();
+    BlockService.instance.changes.removeListener(_onBlocksChanged);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -441,6 +452,50 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('[Home] Şikayet gönderilemedi: $e');
       if (mounted) _showNotification('Şikayet gönderilemedi.', isError: true);
     }
+  }
+
+  Future<void> _handleBlock(PostModel post) async {
+    final theme = themeNotifier.value;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          '${post.toplulukAdi} engellensin mi?',
+          style: TextStyle(color: theme.textColor, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Bu topluluğun ve gönderi sahibinin paylaşımları akışında artık '
+          'görünmeyecek. Durum ekibimize de bildirilir. Engeli daha sonra '
+          'menüdeki "Engellenenleri Kaldır" ile kaldırabilirsin.',
+          style: TextStyle(color: theme.textMuted, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('İptal', style: TextStyle(color: theme.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.error,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Engelle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await BlockService.instance.blockPostSource(post);
+    if (mounted) _showNotification('${post.toplulukAdi} engellendi.');
+    // Moderasyon ekibinin haberdar olması için arka planda şikayet kaydı.
+    unawaited(
+      _dataService
+          .reportPost(post.id, reason: 'Kullanıcı bu kaynağı engelledi.')
+          .catchError((e) => debugPrint('[Home] Engel bildirimi gönderilemedi: $e')),
+    );
   }
 
   Future<void> _openCreatePost() async {
@@ -838,6 +893,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       _handleSupportTap(post),
                                   onRatingChanged: _handleRatingChanged,
                                   onReport: _handleReport,
+                                  onBlock: _handleBlock,
                                 );
                               }, childCount: _visiblePosts.length),
                             ),

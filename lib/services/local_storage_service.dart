@@ -46,7 +46,8 @@ class LocalStorageService {
   static LocalStorageService? get instance => _instance;
 
   // --- Keys ---
-  static const String _keyPrivacyAccepted = 'privacy_policy_accepted_v1';
+  // v2: kullanım şartları (topluluk kuralları) eklendi — herkes yeniden onaylar.
+  static const String _keyPrivacyAccepted = 'privacy_policy_accepted_v2';
   static const String _keyThemeMode = 'app_theme_mode';
   static const String _keyCachedPosts = 'offline_cached_posts';
   static const String _keyCachedAuthUser = 'cached_auth_user';

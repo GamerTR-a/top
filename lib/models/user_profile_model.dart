@@ -35,8 +35,8 @@ class UserProfileModel {
 
   UserProfileModel({
     required this.adSoyad,
-    this.email = '23010404022@subu.edu.tr',
-    this.birthDate = '15.05.2002',
+    this.email = '',
+    this.birthDate = '',
     required this.bolum,
     required this.sinif,
     required this.profilFoto,
@@ -85,10 +85,10 @@ class UserProfileModel {
   factory UserProfileModel.fromJson(Map<String, dynamic> json) =>
       UserProfileModel(
         adSoyad: json['adSoyad'] as String? ?? '',
-        email: json['email'] as String? ?? '23010404022@subu.edu.tr',
-        birthDate: json['birthDate'] as String? ?? '15.05.2002',
-        bolum: json['bolum'] as String? ?? 'Bilişim Sistemleri Mühendisliği',
-        sinif: json['sinif'] as String? ?? '3. Sınıf',
+        email: json['email'] as String? ?? '',
+        birthDate: json['birthDate'] as String? ?? '',
+        bolum: json['bolum'] as String? ?? '',
+        sinif: json['sinif'] as String? ?? '',
         profilFoto: json['profilFoto'] as String? ?? 'assets/gem.png',
         qrData: json['qrData'] as String? ?? '',
         rozetler: (json['rozetler'] as List? ?? [])

@@ -86,16 +86,22 @@ serve(async (req) => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        from: "NevGenç <onboarding@resend.dev>",
+        // Canlıda RESEND_FROM secret'ı doğrulanmış kendi alan adınızdan bir
+        // gönderen olmalı; resend.dev yalnızca deneme gönderenidir.
+        from: Deno.env.get("RESEND_FROM") ?? "NevGenç <onboarding@resend.dev>",
         to: ["nevgenc54@gmail.com"],
         subject: `[NevGenç] ${subjStr}`,
         html,
       }),
     });
 
-    if (!res.ok) return json({ error: await res.text() }, 500);
+    if (!res.ok) {
+      console.error("send-notification: Resend failed", res.status, await res.text());
+      return json({ error: "E-posta gönderilemedi. Lütfen tekrar deneyin." }, 500);
+    }
     return json({ ok: true });
   } catch (err) {
-    return json({ error: String(err) }, 500);
+    console.error("send-notification: unhandled error", err);
+    return json({ error: "Beklenmeyen bir hata oluştu." }, 500);
   }
 });

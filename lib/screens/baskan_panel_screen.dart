@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../utils/secure_screen.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
+import 'baskan_panel/info_tab.dart';
 import 'baskan_panel/members_tab.dart';
 import 'baskan_panel/posts_tab.dart';
 import 'baskan_panel/links_tab.dart';
@@ -42,11 +43,6 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
   List<Map<String, dynamic>> _posts = [];
   bool _loadingPosts = false;
 
-  final _whatsappCtrl = TextEditingController();
-  final _telegramCtrl = TextEditingController();
-  final _instagramCtrl = TextEditingController();
-  bool _savingLinks = false;
-
   final _notifTitleCtrl = TextEditingController();
   final _notifBodyCtrl = TextEditingController();
   final Set<String> _selectedRecipientIds = {};
@@ -55,7 +51,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     // Üye e-posta listesi görev değiştirici önizlemesinde/ekran görüntüsünde
     // görünmesin (bkz. kontrol.md Bölüm 7 — FLAG_SECURE).
     SecureScreen.enable();
@@ -66,9 +62,6 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
   void dispose() {
     SecureScreen.disable();
     _tabController.dispose();
-    _whatsappCtrl.dispose();
-    _telegramCtrl.dispose();
-    _instagramCtrl.dispose();
     _notifTitleCtrl.dispose();
     _notifBodyCtrl.dispose();
     super.dispose();
@@ -126,7 +119,6 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
     _selectedRecipientIds.clear();
     _loadMembers(communityId);
     _loadPosts(communityId);
-    _loadLinks(communityId);
   }
 
   Future<void> _loadMembers(int communityId) async {
@@ -157,19 +149,6 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
     } catch (e) {
       if (mounted) setState(() => _loadingPosts = false);
     }
-  }
-
-  Future<void> _loadLinks(int communityId) async {
-    try {
-      final res = await _api.getCommunityLinks(communityId);
-      if (mounted) {
-        setState(() {
-          _whatsappCtrl.text = res['whatsapp'] ?? '';
-          _telegramCtrl.text = res['telegram'] ?? '';
-          _instagramCtrl.text = res['instagram'] ?? '';
-        });
-      }
-    } catch (_) {}
   }
 
   Future<void> _removeMember(String userId, String name) async {
@@ -267,35 +246,13 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
     }
   }
 
-  Future<void> _saveLinks() async {
-    if (_selectedCommunity == null) return;
-    final theme = themeNotifier.value;
-    setState(() => _savingLinks = true);
-
-    try {
-      final updatedLinks = {
-        'whatsapp': _whatsappCtrl.text.trim(),
-        'telegram': _telegramCtrl.text.trim(),
-        'instagram': _instagramCtrl.text.trim(),
-      };
-      await _api.updateCommunityLinks(_selectedCommunity!.id, updatedLinks);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Bağlantılar başarıyla kaydedildi.'),
-            backgroundColor: theme.primary,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e'), backgroundColor: theme.error),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _savingLinks = false);
-    }
+  void _onCommunityUpdated(Topluluk updated) {
+    setState(() {
+      _myCommunities = [
+        for (final c in _myCommunities) c.id == updated.id ? updated : c,
+      ];
+      if (_selectedCommunity?.id == updated.id) _selectedCommunity = updated;
+    });
   }
 
   void _copyToClipboard(String text, String label) {
@@ -386,6 +343,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                           unselectedLabelColor: theme.textMuted,
                           isScrollable: true,
                           tabs: const [
+                            Tab(icon: Icon(Icons.badge_outlined), text: 'Bilgiler'),
                             Tab(icon: Icon(Icons.people_outline), text: 'Üyeler & Mailler'),
                             Tab(icon: Icon(Icons.article_outlined), text: 'Gönderiler'),
                             Tab(icon: Icon(Icons.link_outlined), text: 'Bağlantılar'),
@@ -396,6 +354,11 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                           child: TabBarView(
                             controller: _tabController,
                             children: [
+                              InfoTab(
+                                theme: theme,
+                                community: _selectedCommunity!,
+                                onSaved: _onCommunityUpdated,
+                              ),
                               MembersTab(
                                 theme: theme,
                                 loading: _loadingMembers,
@@ -417,11 +380,7 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                               ),
                               LinksTab(
                                 theme: theme,
-                                whatsappController: _whatsappCtrl,
-                                telegramController: _telegramCtrl,
-                                instagramController: _instagramCtrl,
-                                saving: _savingLinks,
-                                onSave: _saveLinks,
+                                communityId: _selectedCommunity!.id,
                               ),
                               NotifyTab(
                                 theme: theme,
@@ -546,7 +505,9 @@ class _BaskanPanelScreenState extends State<BaskanPanelScreen>
                       )
                     else
                       Text(
-                        sel.ad,
+                        sel.kisaltma.isEmpty
+                            ? sel.ad
+                            : '${sel.ad} (${sel.kisaltma})',
                         style: TextStyle(
                           color: theme.textColor,
                           fontSize: 17,

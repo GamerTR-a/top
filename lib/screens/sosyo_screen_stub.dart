@@ -1,11 +1,52 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../models/sosyo_texts.dart';
+import '../services/supabase_data_service.dart';
 import '../widgets/animated_theme_background.dart';
 import '../theme/app_theme.dart';
 
-class SosyoScreen extends StatelessWidget {
+class SosyoScreen extends StatefulWidget {
   const SosyoScreen({super.key});
+
+  @override
+  State<SosyoScreen> createState() => _SosyoScreenState();
+}
+
+class _SosyoScreenState extends State<SosyoScreen> {
+  String _description =
+      SosyoTexts.cachedDescription ?? SosyoTexts.defaultDescription;
+  String _about = SosyoTexts.cachedAbout ?? SosyoTexts.defaultAbout;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTexts();
+  }
+
+  Future<void> _loadTexts() async {
+    try {
+      final settings = await SupabaseDataService().getAppSettings(
+        const [SosyoTexts.descriptionKey, SosyoTexts.aboutKey],
+      );
+      String pick(String key, String fallback) {
+        final v = settings[key]?.trim() ?? '';
+        return v.isEmpty ? fallback : v;
+      }
+
+      final description =
+          pick(SosyoTexts.descriptionKey, SosyoTexts.defaultDescription);
+      final about = pick(SosyoTexts.aboutKey, SosyoTexts.defaultAbout);
+      SosyoTexts.remember(description, about);
+      if (!mounted) return;
+      setState(() {
+        _description = description;
+        _about = about;
+      });
+    } catch (e) {
+      debugPrint('[Sosyo] Metinler alınamadı, varsayılanlar gösteriliyor: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +107,7 @@ class SosyoScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'NevGenç topluluğunun sosyal platformu. Aşağıdaki bağlantılardan bize ulaşabilir, etkinliklerden haberdar olabilirsin!',
+                              _description,
                               style: TextStyle(
                                 color: theme.textMuted,
                                 fontSize: 13,
@@ -148,7 +189,7 @@ class SosyoScreen extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          'Merhabalar; ben Bilgisayar Mühendisliği Öğrencisi Abdurrahman Turan Özcan; Yazılım Mühendisliği Öğrencisi Deniz Emir Yıldız, Yazılım Mühendisliği Öğrencisi Mehmet Ali Işık\'a teşekkür ederek söze başlamak istiyorum. NevGenç, Sakarya ve Sakarya Uygulamalı Bilimler üniversitesindeki toplulukların ve öğrenci arkadaşlarımızın hayatını kolaylaştırmak ve üniversite hayatını en verimli şekilde geçirmelerini amaçlayarak ortaya çıkmış bir projedir. Sakarya Belediyesi, Serdivan\'daki çeşitli işletmeler, Çekirdekten Girişimci Vakfı, üniversite toplulukları ve üniversite yönetimi arasında köprü olarak kampüsümüzü ve Sakaryamızı geleceğe taşımak için NevGenç projesini hayata geçirdik.',
+                          _about,
                           style: TextStyle(
                             color: theme.textMuted,
                             fontSize: 13,

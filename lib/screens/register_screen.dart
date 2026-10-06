@@ -147,10 +147,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'Kayıt için sadece .edu veya .edu.tr uzantılı öğrenci e-postası kullanılabilir.');
       return;
     }
-    if (_birthDateCtrl.text.trim().isEmpty) {
-      setState(() => _errorMsg = 'Lütfen doğum tarihinizi girin.');
-      return;
-    }
     if (_selectedDepartment == null || _selectedDepartment!.trim().isEmpty) {
       setState(() => _errorMsg = 'Lütfen bir bölüm seçin.');
       return;
@@ -346,13 +342,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   autofillHints: const [AutofillHints.email],
                 ),
                 const SizedBox(height: 16),
-                _buildLabel('Doğum Tarihi', theme),
+                _buildLabel('Doğum Tarihi (isteğe bağlı)', theme),
                 GestureDetector(
                   onTap: _selectBirthDate,
                   child: AbsorbPointer(
                     child: _buildField(
                       controller: _birthDateCtrl,
-                      hint: 'GG.AA.YYYY (Örn: 15.05.2002)',
+                      hint: 'GG.AA.YYYY',
                       icon: Icons.cake_outlined,
                       theme: theme,
                       suffix: IconButton(

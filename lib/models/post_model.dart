@@ -16,6 +16,8 @@ class PostModel {
   final bool isEvent;
   final bool isEventJoined;
   final int eventParticipantCount;
+  final int? communityId;
+  final String? userId;
 
   const PostModel({
     required this.id,
@@ -35,6 +37,8 @@ class PostModel {
     this.isEvent = false,
     this.isEventJoined = false,
     this.eventParticipantCount = 0,
+    this.communityId,
+    this.userId,
   });
 
   static const Object _unset = Object();
@@ -68,6 +72,8 @@ class PostModel {
       isEvent: isEvent ?? this.isEvent,
       isEventJoined: isEventJoined ?? this.isEventJoined,
       eventParticipantCount: eventParticipantCount ?? this.eventParticipantCount,
+      communityId: communityId,
+      userId: userId,
     );
   }
 
@@ -90,6 +96,8 @@ class PostModel {
       isEvent: json['is_event'] as bool? ?? false,
       isEventJoined: json['is_event_joined'] as bool? ?? false,
       eventParticipantCount: (json['event_participant_count'] as num?)?.toInt() ?? 0,
+      communityId: (json['community_id'] as num?)?.toInt(),
+      userId: json['user_id'] as String?,
     );
   }
 }

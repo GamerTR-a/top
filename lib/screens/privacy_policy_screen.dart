@@ -92,7 +92,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                                 ),
                               ),
                               Text(
-                                'Google Play Uyumlu Yerel Depolama Politikası',
+                                'Gizlilik Politikası ve Kullanım Şartları',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
@@ -142,6 +142,19 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                       icon: Icons.contact_support_outlined,
                       content:
                           'Verilerinizin silinmesini talep etme veya yerel depolamayı temizleme hakkınız saklıdır. Sorularınız için destek ekibimizle iletişime geçebilirsiniz.',
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section 5: Kullanım Şartları (App Store Kural 1.2)
+                    _buildSectionCard(
+                      context,
+                      title: '5. Kullanım Şartları ve Topluluk Kuralları',
+                      icon: Icons.gavel_rounded,
+                      content:
+                          'NevGenç\'te nefret söylemi, taciz, tehdit, müstehcenlik, şiddet, ayrımcılık, yanıltıcı veya yasa dışı içerik ile kötüye kullanıcı davranışlarına KESİNLİKLE tolerans gösterilmez. '
+                          'Uygunsuz bir gönderiyi menüdeki "Şikayet Et" ile bildirebilir, "Topluluğu Engelle" ile akışınızdan kaldırabilirsiniz. '
+                          'Şikayetler en geç 24 saat içinde incelenir; kurallara aykırı içerik kaldırılır ve ihlal eden hesaplar uygulamadan çıkarılır. '
+                          'Uygulamayı kullanarak bu şartları kabul etmiş olursunuz.',
                     ),
                   ],
                 ),

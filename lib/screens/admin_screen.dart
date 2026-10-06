@@ -10,7 +10,10 @@ import '../utils/turkish_text.dart';
 import '../widgets/animated_theme_background.dart';
 import '../widgets/app_network_image.dart';
 import '../theme/app_theme.dart';
+import 'campus_poi_admin_screen.dart';
 import 'news_admin_screen.dart';
+import 'quiz_admin_screen.dart';
+import 'sosyo_texts_admin_screen.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -1688,6 +1691,45 @@ class _AdminScreenState extends State<AdminScreen>
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const NewsAdminScreen()),
+                        );
+                      },
+                    ),
+                    _SettingsTile(
+                      icon: Icons.auto_awesome,
+                      title: 'SOSYO Metinleri',
+                      subtitle: 'Nev+ SOSYO açıklamasını ve Hakkında yazısını düzenle',
+                      color: const Color(0xFF4CAF50),
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SosyoTextsAdminScreen()),
+                        );
+                      },
+                    ),
+                    _SettingsTile(
+                      icon: Icons.add_location_alt_outlined,
+                      title: 'Kampüs Cepte Noktaları',
+                      subtitle: 'Haritaya yurt, durak ve diğer noktaları ekle/sil',
+                      color: const Color(0xFF00ACC1),
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CampusPoiAdminScreen()),
+                        );
+                      },
+                    ),
+                    _SettingsTile(
+                      icon: Icons.quiz_outlined,
+                      title: 'Yarışma Soruları',
+                      subtitle: 'Kampüs Bilgi Yarışması\'na soru ekle/sil',
+                      color: const Color(0xFFFF7043),
+                      theme: theme,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const QuizAdminScreen()),
                         );
                       },
                     ),

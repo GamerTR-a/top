@@ -63,7 +63,7 @@ class AuthUser {
           supabaseUser.email?.split('@').first ??
           '',
       email: supabaseUser.email ?? '',
-      birthDate: profile['birth_date'] as String? ?? '01.01.2002',
+      birthDate: supabaseUser.userMetadata?['birth_date'] as String?,
       department: rawDept,
       isAdmin: role == 'admin',
       isBaskan: role == 'baskan',

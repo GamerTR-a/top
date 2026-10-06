@@ -34,6 +34,12 @@ jobs:
           flutter config --no-enable-swift-package-manager
           flutter config --enable-ios
 
+      - name: app_config.dart'i secret'lardan olustur
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bash tool/ci_write_app_config.sh
+
       - name: Bagimliliklari ve Pod'lari indir
         run: |
           flutter pub get

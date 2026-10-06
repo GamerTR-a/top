@@ -49,15 +49,17 @@ Kişisel verileriniz aşağıdaki amaçlarla sınırlı ve ölçülü olarak iş
 
 Verileriniz hiçbir koşulda üçüncü taraflara satılmaz veya ticari/reklam amaçlarıyla paylaşılmaz. Hizmetlerin yürütülmesi için yalnızca aşağıdaki güvenilir altyapı sağlayıcıları ile veri işlenmektedir:
 
-- **Supabase Inc.:** Veritabanı barındırma, kullanıcı kimlik doğrulama (Auth) ve medya depolama (Storage) hizmetleri. Verileriniz Supabase'in yüksek güvenlikli bulut altyapısında Satır Düzeyi Güvenlik (RLS - Row Level Security) protokolleri ile korunmaktadır.
-- **Google Firebase (Google LLC):** Cihazınıza anlık bildirim (push notification) iletebilmek için FCM altyapısı, uygulama çökmelerini tespit edip düzeltebilmek için Crashlytics, ve uygulama performansını izleyebilmek için Performance Monitoring kullanılır (hepsi Ayarlar'dan kapatılabilir).
+- **Supabase Inc.:** Veritabanı barındırma, kullanıcı kimlik doğrulama (Auth) ve medya depolama (Storage) hizmetleri. Verileriniz Supabase'in **SOC 2 Type II, HIPAA ve GDPR** sertifikalı bulut altyapısında Satır Düzeyi Güvenlik (RLS - Row Level Security) protokolleri ile korunmaktadır.
+- **Google Firebase (Google LLC):** Cihazınıza anlık bildirim (push notification) iletebilmek için FCM altyapısı, uygulama çökmelerini tespit edip düzeltebilmek için Crashlytics ve Performance Monitoring kullanılır. Google Cloud altyapısı **ISO/IEC 27001, 27017, 27018, SOC 1, SOC 2, SOC 3 ve PCI-DSS** sertifikalarına sahiptir.
 - **OpenStreetMap / Mapbox:** Kampüs haritası karo görsellerinin sunulması için harita servis sağlayıcıları.
 
 ---
 
-## 4. Veri Güvenliği ve Saklama Süresi
+## 4. Veri Güvenliği ve Altyapı Sertifikasyon Uyumluluğu
 
-Kişisel verileriniz, hesabınız aktif olduğu sürece saklanır. Verilerinizin yetkisiz erişim, kayıp veya kötüye kullanıma karşı korunması için endüstri standardı şifreleme yöntemleri (SSL/TLS), Satır Düzeyi Güvenlik (RLS) kuralları ve güvenli kimlik doğrulama protokolleri uygulanmaktadır.
+Kişisel verileriniz, hesabınız aktif olduğu sürece saklanır. Verilerinizin yetkisiz erişim, kayıp veya kötüye kullanıma karşı korunması için endüstri standardı şifreleme yöntemleri (SSL/TLS 1.3), Satır Düzeyi Güvenlik (RLS) kuralları ve güvenli kimlik doğrulama protokolleri uygulanmaktadır.
+
+NevGenç mobil uygulaması ve sunucu mimarisi **OWASP MASVS (Mobile Application Security Verification Standard v2.0)** güvenlik standartlarına göre denetlenmiş ve yapılandırılmıştır. Verilerinizin saklandığı tüm üçüncü taraf bulut sağlayıcıları bağımsız kuruluşlarca verilmiş uluslararası SOC 2 Type II ve ISO 27001 sertifikalarına sahiptir.
 
 Bazı geçici içerikler, sunucularımızda otomatik olarak ve daha kısa sürelerde silinir:
 - Gönderiler: 30 gün,

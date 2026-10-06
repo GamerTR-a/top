@@ -9,6 +9,7 @@ import '../screens/my_data_screen.dart';
 import '../screens/campus_map_screen.dart';
 import '../screens/games/game_room_screen.dart';
 import '../screens/ticket_list_screen.dart';
+import '../services/block_service.dart';
 import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
 
@@ -77,24 +78,6 @@ class OptionsSheet extends StatelessWidget {
           size: 16,
         ),
         onTap: onTap ?? () => Navigator.pop(context),
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String featureName) {
-    final theme = themeNotifier.value;
-    final messenger = ScaffoldMessenger.of(context);
-    Navigator.pop(context);
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          '$featureName yakında geliyor! 🚀',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: theme.secondary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -292,6 +275,23 @@ class OptionsSheet extends StatelessWidget {
                     );
                   },
                 ),
+                _buildMenuItem(
+                  context,
+                  'Engellenenleri Kaldır',
+                  Icons.block_rounded,
+                  const Color(0xFF607D8B),
+                  onTap: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(context);
+                    await BlockService.instance.clearAll();
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Tüm engeller kaldırıldı.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
                 if (onLogout != null)
                   _buildMenuItem(
                     context,
@@ -311,7 +311,7 @@ class OptionsSheet extends StatelessWidget {
                     onTap: () => _confirmDeleteAccount(context),
                   ),
               ] else ...[
-                // NEV +: Kampüs Cepte, Oyun Odası, Kitap Okuma Kulübü, Topluluk Haberleri, SOSYO, Admin Paneli
+                // NEV +: Kampüs Cepte, Oyun Odası, SOSYO, Admin Paneli
                 _buildMenuItem(
                   context,
                   'Kampüs Cepte',
@@ -341,20 +341,6 @@ class OptionsSheet extends StatelessWidget {
                       ),
                     );
                   },
-                ),
-                _buildMenuItem(
-                  context,
-                  'Kitap Okuma Kulübü',
-                  Icons.menu_book,
-                  const Color(0xFFFFD700),
-                  onTap: () => _showComingSoon(context, 'Kitap Okuma Kulübü'),
-                ),
-                _buildMenuItem(
-                  context,
-                  'Topluluk Haberleri',
-                  Icons.newspaper,
-                  const Color(0xFF9D4EDD),
-                  onTap: () => _showComingSoon(context, 'Topluluk Haberleri'),
                 ),
                 _buildMenuItem(
                   context,

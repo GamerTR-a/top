@@ -51,9 +51,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UserProfileModel _fallbackProfile() => UserProfileModel(
         adSoyad: widget.user.name,
         email: widget.user.email,
-        birthDate: widget.user.birthDate ?? '15.05.2002',
-        bolum: widget.user.department ?? 'Bilişim Sistemleri Mühendisliği',
-        sinif: widget.user.birthDate ?? '3. Sınıf',
+        birthDate: widget.user.birthDate ?? '',
+        bolum: widget.user.department ?? '',
+        sinif: '',
         profilFoto: 'assets/gem.png',
         qrData:
             "NEVGENC KİMLİĞİ\nAd Soyad: ${widget.user.name}\nE-posta: ${widget.user.email}",
@@ -486,16 +486,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
 
-        final displayName = (_profile?.adSoyad.isNotEmpty == true && _profile!.adSoyad != 'Ahmet Safa Zengin')
+        final displayName = _profile?.adSoyad.isNotEmpty == true
             ? _profile!.adSoyad
             : widget.user.name;
         final email = widget.user.email;
-        final department = (_profile?.bolum.isNotEmpty == true && _profile!.bolum != 'Bilişim Sistemleri Mühendisliği')
+        final department = _profile?.bolum.isNotEmpty == true
             ? _profile!.bolum
-            : (widget.user.department ?? 'Bilişim Sistemleri Mühendisliği');
-        final grade = (_profile?.sinif.isNotEmpty == true && _profile!.sinif != '3. Sınıf')
-            ? _profile!.sinif
-            : (widget.user.birthDate ?? '3. Sınıf');
+            : (widget.user.department ?? '');
+        final grade = _profile?.sinif ?? '';
         final formattedQrData =
             "NEVGENC KİMLİĞİ\nAd Soyad: $displayName\nE-posta: $email\nSınıf: $grade\nBölüm: $department";
         final screenWidth = MediaQuery.of(context).size.width;

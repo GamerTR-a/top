@@ -29,7 +29,7 @@
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Konumunuzu kampüs haritası, Sakarya dışı kontrolü ve kıble pusulası için kullanıyoruz.</string>
+		<string>Konumunuzu kampüs haritasında yerinizi göstermek, kıble yönünü hesaplamak ve Nev Fırsatlar'da kupon almak için işletmeye yakın olduğunuzu doğrulamak amacıyla kullanıyoruz. Kupon doğrulamasında konumunuz yalnızca o an sunucuya gönderilir, saklanmaz.</string>
 		<key>NSMotionUsageDescription</key>
 		<string>Pusula yönünü hesaplamak için cihazın hareket sensörünü kullanıyoruz.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
@@ -59,6 +59,10 @@
 				</array>
 			</dict>
 		</dict>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
 		<key>UIApplicationSupportsIndirectInputEvents</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>

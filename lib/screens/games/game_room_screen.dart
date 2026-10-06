@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/animated_theme_background.dart';
 import 'bubble_shooter_game.dart';
+import 'campus_quiz_game.dart';
+import 'daily_word_game.dart';
 import 'sudoku_game.dart';
 import 'tetris_game.dart';
 
 /// NEV + → Oyun Odası launcher'ı.
-/// Üç mini oyunu şık kartlarla listeler: Baloncuk Patlatma, Tetris, Sudoku.
+/// Mini oyunları kartlarla listeler: Günün Kelimesi, Bilgi Yarışması,
+/// Baloncuk Patlatma, NevBlok, Sudoku.
 class GameRoomScreen extends StatelessWidget {
   const GameRoomScreen({super.key});
 
@@ -18,7 +21,7 @@ class GameRoomScreen extends StatelessWidget {
       gradient: [Color(0xFF00ACC1), Color(0xFF38BDF8)],
     ),
     _GameInfo(
-      title: 'Tetris',
+      title: 'NevBlok',
       description: 'Klasik blok istifleme. Satırları temizle, skoru yükselt.',
       icon: Icons.grid_view_rounded,
       gradient: [Color(0xFF6366F1), Color(0xFFB388FF)],
@@ -28,6 +31,18 @@ class GameRoomScreen extends StatelessWidget {
       description: '9×9 mantık bulmacası. Üç zorluk, hata vurgusu, süre.',
       icon: Icons.apps_rounded,
       gradient: [Color(0xFF4CAF50), Color(0xFF00E5FF)],
+    ),
+    _GameInfo(
+      title: 'Günün Kelimesi',
+      description: 'Her gün herkese aynı 5 harfli kelime. 6 tahminde bul!',
+      icon: Icons.spellcheck_rounded,
+      gradient: [Color(0xFF43A047), Color(0xFFF9A825)],
+    ),
+    _GameInfo(
+      title: 'Kampüs Bilgi Yarışması',
+      description: '10 soru, 20 saniye. Sakarya, kampüs ve genel kültür.',
+      icon: Icons.quiz_rounded,
+      gradient: [Color(0xFFFF7043), Color(0xFFFFCA28)],
     ),
   ];
 
@@ -67,6 +82,16 @@ class GameRoomScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     _buildHeader(theme),
                     const SizedBox(height: 24),
+                    _GameCard(
+                      info: _games[3],
+                      onTap: () => _open(context, const DailyWordGame()),
+                    ),
+                    const SizedBox(height: 16),
+                    _GameCard(
+                      info: _games[4],
+                      onTap: () => _open(context, const CampusQuizGame()),
+                    ),
+                    const SizedBox(height: 16),
                     _GameCard(
                       info: _games[0],
                       onTap: () => _open(context, const BubbleShooterGame()),

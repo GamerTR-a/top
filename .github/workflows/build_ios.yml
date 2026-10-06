@@ -23,6 +23,12 @@ jobs:
       - name: Disable Swift Package Manager
         run: flutter config --no-enable-swift-package-manager
 
+      - name: Generate app_config.dart from secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: bash tool/ci_write_app_config.sh
+
       - name: Install Dependencies & Pods
         run: |
           flutter pub get
