@@ -52,7 +52,7 @@ dependencies:
 
   # Yerel / zamanlanmış bildirimler (hatırlatıcılar — uygulama kapalıyken de çalışır)
   flutter_local_notifications: ^18.0.1
-  timezone: ^0.9.4
+  timezone: ^0.10.1
 
   # Kampüs Cepte: harita, konum, pusula
   flutter_map: ^8.3.1
